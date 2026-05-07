@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { pluralize, statusFor, headlineFor } from "./engine";
-import type { GoalConfig } from "./types";
+import { pluralize, statusFor, headlineFor, pickMondayMove } from "./engine";
+import type { GoalConfig, Receipt } from "./types";
 
 describe("pluralize", () => {
   it("returns singular when n === 1", () => {
@@ -84,5 +84,44 @@ describe("headlineFor", () => {
 
   it("does not append drag sentence when drag count = 0", () => {
     expect(headlineFor("shipped", goal, 5, 0)).toBe("Shipped: 5/5 PRs this week.");
+  });
+});
+
+function open(props: Partial<Receipt> & { id: string; prNumber: number }): Receipt {
+  return {
+    id: props.id,
+    prNumber: props.prNumber,
+    repo: props.repo ?? "owner/repo",
+    title: props.title ?? "test",
+    url: props.url ?? "https://example.test",
+    openedAt: props.openedAt ?? "2026-05-01T00:00:00Z",
+    hoursSinceUpdate: props.hoursSinceUpdate,
+  };
+}
+
+describe("pickMondayMove", () => {
+  it("returns null when no drag and no open PRs", () => {
+    expect(pickMondayMove([], [])).toBeNull();
+  });
+
+  it("when drag exists, picks the stalest", () => {
+    const drag = [
+      open({ id: "a", prNumber: 10, repo: "x/y", hoursSinceUpdate: 30 }),
+      open({ id: "b", prNumber: 11, repo: "x/y", hoursSinceUpdate: 50 }),
+      open({ id: "c", prNumber: 12, repo: "x/y", hoursSinceUpdate: 25 }),
+    ];
+    expect(pickMondayMove(drag, drag)).toBe("Unblock x/y#11 — stale 50h.");
+  });
+
+  it("when no drag but open PRs exist, picks most recently opened", () => {
+    const open1 = open({ id: "a", prNumber: 10, repo: "x/y", openedAt: "2026-05-01T08:00:00Z", hoursSinceUpdate: 4 });
+    const open2 = open({ id: "b", prNumber: 11, repo: "x/y", openedAt: "2026-05-05T18:00:00Z", hoursSinceUpdate: 2 });
+    const open3 = open({ id: "c", prNumber: 12, repo: "x/y", openedAt: "2026-05-04T12:00:00Z", hoursSinceUpdate: 6 });
+    expect(pickMondayMove([], [open1, open2, open3])).toBe("Push x/y#11 — 2h since you opened it.");
+  });
+
+  it("rounds hoursSinceUpdate to a whole number for the open-PR move", () => {
+    const o = open({ id: "a", prNumber: 10, repo: "x/y", openedAt: "2026-05-05T00:00:00Z", hoursSinceUpdate: 6.7 });
+    expect(pickMondayMove([], [o])).toBe("Push x/y#10 — 7h since you opened it.");
   });
 });

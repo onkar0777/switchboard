@@ -1,4 +1,4 @@
-import type { GoalConfig, VerdictStatus } from "./types";
+import type { GoalConfig, Receipt, VerdictStatus } from "./types";
 
 export const DRAG_THRESHOLD_HOURS = 24;
 
@@ -37,4 +37,22 @@ export function headlineFor(
     head += ` ${dragCount} ${dragUnit} ${verb} stale (waiting >${DRAG_THRESHOLD_HOURS}h).`;
   }
   return head;
+}
+
+export function pickMondayMove(drag: Receipt[], openPRs: Receipt[]): string | null {
+  if (drag.length > 0) {
+    const stalest = [...drag].sort(
+      (a, b) => (b.hoursSinceUpdate ?? 0) - (a.hoursSinceUpdate ?? 0),
+    )[0];
+    const hours = Math.round(stalest.hoursSinceUpdate ?? 0);
+    return `Unblock ${stalest.repo}#${stalest.prNumber} — stale ${hours}h.`;
+  }
+  if (openPRs.length > 0) {
+    const newest = [...openPRs].sort(
+      (a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime(),
+    )[0];
+    const hours = Math.round(newest.hoursSinceUpdate ?? 0);
+    return `Push ${newest.repo}#${newest.prNumber} — ${hours}h since you opened it.`;
+  }
+  return null;
 }
