@@ -1,4 +1,5 @@
-import type { GoalConfig, Receipt, VerdictStatus } from "./types";
+import type { AdapterResult, MCPAdapter } from "@/lib/mcp/adapter";
+import type { GoalConfig, Receipt, Verdict, VerdictStatus } from "./types";
 
 export const DRAG_THRESHOLD_HOURS = 24;
 
@@ -91,4 +92,61 @@ export function bucketMomentum(merged: Receipt[], now: Date): number[] {
     }
   }
   return buckets;
+}
+
+export async function computeVerdict(
+  adapter: MCPAdapter,
+  goal: GoalConfig,
+  now: Date,
+): Promise<AdapterResult<Verdict>> {
+  const weekMonday = mondayOfWeek(now);
+  const weekEnd = sundayEndOfWeek(now);
+  const fourWeeksAgo = new Date(weekMonday.getTime() - 21 * DAY_MS);
+
+  const mergedRes = await adapter.listMergedPRs({
+    repos: goal.repos,
+    author: goal.author,
+    since: fourWeeksAgo.toISOString(),
+    until: weekEnd.toISOString(),
+  });
+  if (!mergedRes.ok) return mergedRes;
+
+  const openRes = await adapter.listOpenPRs({
+    repos: goal.repos,
+    author: goal.author,
+  });
+  if (!openRes.ok) return openRes;
+
+  const allMerged = mergedRes.data;
+  const open = openRes.data;
+
+  const thisWeekStart = weekMonday.getTime();
+  const receipts = allMerged.filter((p) => {
+    if (!p.mergedAt) return false;
+    const t = new Date(p.mergedAt).getTime();
+    return t >= thisWeekStart && t <= weekEnd.getTime();
+  });
+
+  const drag = open.filter(
+    (p) => (p.hoursSinceUpdate ?? 0) > DRAG_THRESHOLD_HOURS,
+  );
+
+  const actual = receipts.length;
+  const status = statusFor(actual, goal.target);
+  const headline = headlineFor(status, goal, actual, drag.length);
+  const momentum = bucketMomentum(allMerged, now);
+  const mondayMove = pickMondayMove(drag, open);
+
+  const verdict: Verdict = {
+    goal,
+    status,
+    headline,
+    actual,
+    target: goal.target,
+    receipts,
+    drag,
+    momentum,
+    mondayMove,
+  };
+  return { ok: true, data: verdict };
 }

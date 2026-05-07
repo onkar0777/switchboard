@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { pluralize, statusFor, headlineFor, pickMondayMove, mondayOfWeek, sundayEndOfWeek, bucketMomentum } from "./engine";
+import { pluralize, statusFor, headlineFor, pickMondayMove, mondayOfWeek, sundayEndOfWeek, bucketMomentum, computeVerdict } from "./engine";
 import type { GoalConfig, Receipt } from "./types";
+import { MockAdapter } from "@/lib/mcp/mock";
 
 describe("pluralize", () => {
   it("returns singular when n === 1", () => {
@@ -172,5 +173,48 @@ describe("bucketMomentum", () => {
     const result = bucketMomentum([ancient, ...MOCK_PRS.filter(p => p.mergedAt)], now);
     expect(result).toEqual([3, 5, 4, 4]);
     void fourWeeksAgo;
+  });
+});
+
+describe("computeVerdict (mock adapter, fixed now)", () => {
+  const adapter = new MockAdapter();
+  const goal: GoalConfig = {
+    kind: "github_prs_merged",
+    label: "Ship 5 PRs this week",
+    target: 5,
+    unit: "PR",
+    repos: ["onkarsingh/switchboard", "onkarsingh/other-repo"],
+    author: "onkarsingh",
+  };
+  const now = new Date("2026-05-06T12:00:00Z");
+
+  it("computes the worked-example verdict from the spec", async () => {
+    const r = await computeVerdict(adapter, goal, now);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const v = r.data;
+    expect(v.actual).toBe(4);
+    expect(v.target).toBe(5);
+    expect(v.status).toBe("on_track");
+    expect(v.headline).toBe("On track: 4/5 PRs this week. 1 PR is stale (waiting >24h).");
+    expect(v.receipts.map(r => r.id).sort()).toEqual(["W3_1", "W3_2", "W3_3", "W3_4"]);
+    expect(v.drag.map(r => r.id)).toEqual(["W3_O1"]);
+    expect(v.momentum).toEqual([3, 5, 4, 4]);
+    expect(v.mondayMove).toBe("Unblock onkarsingh/switchboard#116 — stale 50h.");
+  });
+
+  it("returns adapter error transparently", async () => {
+    const broken = {
+      async listMergedPRs() {
+        return { ok: false as const, error: { code: "auth_failed" as const, message: "bad token" } };
+      },
+      async listOpenPRs() {
+        return { ok: true as const, data: [] };
+      },
+    };
+    const r = await computeVerdict(broken, goal, now);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.code).toBe("auth_failed");
   });
 });
