@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pluralize, statusFor, headlineFor, pickMondayMove } from "./engine";
+import { pluralize, statusFor, headlineFor, pickMondayMove, mondayOfWeek, sundayEndOfWeek, bucketMomentum } from "./engine";
 import type { GoalConfig, Receipt } from "./types";
 
 describe("pluralize", () => {
@@ -123,5 +123,54 @@ describe("pickMondayMove", () => {
   it("rounds hoursSinceUpdate to a whole number for the open-PR move", () => {
     const o = open({ id: "a", prNumber: 10, repo: "x/y", openedAt: "2026-05-05T00:00:00Z", hoursSinceUpdate: 6.7 });
     expect(pickMondayMove([], [o])).toBe("Push x/y#10 — 7h since you opened it.");
+  });
+});
+
+describe("mondayOfWeek", () => {
+  it("returns Monday for a Wednesday (UTC)", () => {
+    const wed = new Date("2026-05-06T12:34:56Z");
+    expect(mondayOfWeek(wed).toISOString()).toBe("2026-05-04T00:00:00.000Z");
+  });
+
+  it("returns same Monday for a Monday", () => {
+    const mon = new Date("2026-05-04T08:00:00Z");
+    expect(mondayOfWeek(mon).toISOString()).toBe("2026-05-04T00:00:00.000Z");
+  });
+
+  it("returns the prior Monday for a Sunday", () => {
+    const sun = new Date("2026-05-10T20:00:00Z");
+    expect(mondayOfWeek(sun).toISOString()).toBe("2026-05-04T00:00:00.000Z");
+  });
+});
+
+describe("sundayEndOfWeek", () => {
+  it("returns Sunday 23:59:59.999 for a Wednesday", () => {
+    const wed = new Date("2026-05-06T12:34:56Z");
+    expect(sundayEndOfWeek(wed).toISOString()).toBe("2026-05-10T23:59:59.999Z");
+  });
+});
+
+describe("bucketMomentum", () => {
+  it("buckets 4 weeks of merged PRs (oldest -> current) using mock fixtures", async () => {
+    const { MOCK_PRS } = await import("@/lib/mcp/fixtures");
+    const merged = MOCK_PRS.filter(p => p.mergedAt);
+    const now = new Date("2026-05-06T12:00:00Z");
+    expect(bucketMomentum(merged, now)).toEqual([3, 5, 4, 4]);
+  });
+
+  it("returns four zeros when no PRs", () => {
+    expect(bucketMomentum([], new Date("2026-05-06T12:00:00Z"))).toEqual([0, 0, 0, 0]);
+  });
+
+  it("ignores PRs older than 4 weeks ago", async () => {
+    const { MOCK_PRS } = await import("@/lib/mcp/fixtures");
+    const now = new Date("2026-05-06T12:00:00Z");
+    const monday = mondayOfWeek(now);
+    const fourWeeksAgo = new Date(monday);
+    fourWeeksAgo.setUTCDate(fourWeeksAgo.getUTCDate() - 21);
+    const ancient = { ...MOCK_PRS[0], id: "ancient", mergedAt: "2024-01-01T00:00:00Z" };
+    const result = bucketMomentum([ancient, ...MOCK_PRS.filter(p => p.mergedAt)], now);
+    expect(result).toEqual([3, 5, 4, 4]);
+    void fourWeeksAgo;
   });
 });
