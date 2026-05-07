@@ -40,7 +40,11 @@ export function headlineFor(
   return head;
 }
 
-export function pickMondayMove(drag: Receipt[], openPRs: Receipt[]): string | null {
+export function pickMondayMove(
+  drag: Receipt[],
+  openPRs: Receipt[],
+  now: Date,
+): string | null {
   if (drag.length > 0) {
     const stalest = [...drag].sort(
       (a, b) => (b.hoursSinceUpdate ?? 0) - (a.hoursSinceUpdate ?? 0),
@@ -52,7 +56,9 @@ export function pickMondayMove(drag: Receipt[], openPRs: Receipt[]): string | nu
     const newest = [...openPRs].sort(
       (a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime(),
     )[0];
-    const hours = Math.round(newest.hoursSinceUpdate ?? 0);
+    const hours = Math.round(
+      (now.getTime() - new Date(newest.openedAt).getTime()) / (60 * 60 * 1000),
+    );
     return `Push ${newest.repo}#${newest.prNumber} — ${hours}h since you opened it.`;
   }
   return null;
@@ -135,7 +141,7 @@ export async function computeVerdict(
   const status = statusFor(actual, goal.target);
   const headline = headlineFor(status, goal, actual, drag.length);
   const momentum = bucketMomentum(allMerged, now);
-  const mondayMove = pickMondayMove(drag, open);
+  const mondayMove = pickMondayMove(drag, open, now);
 
   const verdict: Verdict = {
     goal,

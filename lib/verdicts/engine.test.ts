@@ -101,8 +101,10 @@ function open(props: Partial<Receipt> & { id: string; prNumber: number }): Recei
 }
 
 describe("pickMondayMove", () => {
+  const NOW = new Date("2026-05-06T12:00:00Z");
+
   it("returns null when no drag and no open PRs", () => {
-    expect(pickMondayMove([], [])).toBeNull();
+    expect(pickMondayMove([], [], NOW)).toBeNull();
   });
 
   it("when drag exists, picks the stalest", () => {
@@ -111,19 +113,28 @@ describe("pickMondayMove", () => {
       open({ id: "b", prNumber: 11, repo: "x/y", hoursSinceUpdate: 50 }),
       open({ id: "c", prNumber: 12, repo: "x/y", hoursSinceUpdate: 25 }),
     ];
-    expect(pickMondayMove(drag, drag)).toBe("Unblock x/y#11 — stale 50h.");
+    expect(pickMondayMove(drag, drag, NOW)).toBe("Unblock x/y#11 — stale 50h.");
   });
 
   it("when no drag but open PRs exist, picks most recently opened", () => {
+    const now = new Date("2026-05-05T20:00:00Z");
     const open1 = open({ id: "a", prNumber: 10, repo: "x/y", openedAt: "2026-05-01T08:00:00Z", hoursSinceUpdate: 4 });
     const open2 = open({ id: "b", prNumber: 11, repo: "x/y", openedAt: "2026-05-05T18:00:00Z", hoursSinceUpdate: 2 });
     const open3 = open({ id: "c", prNumber: 12, repo: "x/y", openedAt: "2026-05-04T12:00:00Z", hoursSinceUpdate: 6 });
-    expect(pickMondayMove([], [open1, open2, open3])).toBe("Push x/y#11 — 2h since you opened it.");
+    expect(pickMondayMove([], [open1, open2, open3], now)).toBe("Push x/y#11 — 2h since you opened it.");
   });
 
-  it("rounds hoursSinceUpdate to a whole number for the open-PR move", () => {
-    const o = open({ id: "a", prNumber: 10, repo: "x/y", openedAt: "2026-05-05T00:00:00Z", hoursSinceUpdate: 6.7 });
-    expect(pickMondayMove([], [o])).toBe("Push x/y#10 — 7h since you opened it.");
+  it("rounds hours-since-opened to a whole number for the open-PR move", () => {
+    const now = new Date("2026-05-05T06:42:00Z");
+    const o = open({ id: "a", prNumber: 10, repo: "x/y", openedAt: "2026-05-05T00:00:00Z", hoursSinceUpdate: 0 });
+    expect(pickMondayMove([], [o], now)).toBe("Push x/y#10 — 7h since you opened it.");
+  });
+
+  it("reports hours since opened, not since last update, for the open-PR move", () => {
+    // PR opened 5 days ago but updated 2h ago — message must reflect open age, not update age.
+    const now = new Date("2026-05-06T12:00:00Z");
+    const o = open({ id: "a", prNumber: 10, repo: "x/y", openedAt: "2026-05-01T12:00:00Z", hoursSinceUpdate: 2 });
+    expect(pickMondayMove([], [o], now)).toBe("Push x/y#10 — 120h since you opened it.");
   });
 });
 
