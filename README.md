@@ -24,7 +24,7 @@ export GITHUB_TOKEN=ghp_xxx
 $EDITOR switchboard.config.ts
 
 npm run dev
-# open http://localhost:3000
+# open http://localhost:8000
 ```
 
 ## Try it without a token (mock data)

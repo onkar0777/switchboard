@@ -7,7 +7,7 @@ export type FetchVerdictResult =
 
 export async function fetchVerdict(): Promise<FetchVerdictResult> {
   const h = headers();
-  const host = h.get("host") ?? "localhost:3000";
+  const host = h.get("host") ?? "localhost:8000";
   const proto = h.get("x-forwarded-proto") ?? "http";
   const res = await fetch(`${proto}://${host}/api/verdict`, { cache: "no-store" });
   if (!res.ok) {
