@@ -7,7 +7,7 @@ const config: SwitchboardConfig = {
       label: "Ship 5 PRs this week",
       target: 5,
       unit: "PR",
-      repos: ["onkarsingh/switchboard", "onkarsingh/other-repo"],
+      repos: ["onkarsingh/switchboard"],
       author: "onkarsingh",
     },
   ],
