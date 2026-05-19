@@ -15,6 +15,8 @@ export function MomentumSparkline({ counts }: { counts: number[] }) {
   const lastIndex = counts.length - 1;
   const lastX = lastIndex * stepX;
   const lastY = h - (counts[lastIndex] / max) * (h - 4) - 2;
+  // Flip label above the dot when there's no room below (viewBox is h=44, text font-size 9).
+  const labelY = lastY > h - 14 ? lastY - 4 : lastY + 11;
   const titleText = `Momentum: ${counts.join(", ")} PRs over ${counts.length} weeks. Current week is partial.`;
 
   return (
@@ -49,7 +51,7 @@ export function MomentumSparkline({ counts }: { counts: number[] }) {
         />
         <text
           x={lastX + 4}
-          y={lastY + 3}
+          y={labelY}
           className="font-mono"
           fontSize={9}
           fill="currentColor"
