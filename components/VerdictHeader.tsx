@@ -1,18 +1,15 @@
 import type { Verdict } from "@/lib/verdicts/types";
-
-const STATUS_TONE: Record<Verdict["status"], string> = {
-  shipped: "text-emerald-700",
-  on_track: "text-emerald-700",
-  nearly_there: "text-amber-700",
-  behind: "text-rose-700",
-};
+import { STATUS_TONE, EYEBROW } from "@/lib/design-tokens";
 
 export function VerdictHeader({ verdict }: { verdict: Verdict }) {
   return (
-    <header className="border-b border-stone-200 pb-6">
-      <p className="text-xs uppercase tracking-wider text-stone-500">North Star</p>
-      <h1 className="mt-1 text-2xl font-semibold text-stone-900">{verdict.goal.label}</h1>
-      <p className={`mt-4 text-xl font-medium ${STATUS_TONE[verdict.status]}`}>
+    <header className="border-b border-stone-200 pb-8">
+      <p className={EYEBROW} id="northstar-label">North Star</p>
+      <h1 className="mt-2 text-base font-normal text-stone-600">{verdict.goal.label}</h1>
+      <p
+        className={`mt-5 font-serif text-[40px] leading-[1.1] font-semibold tracking-[-0.01em] ${STATUS_TONE[verdict.status]}`}
+        aria-labelledby="northstar-label"
+      >
         {verdict.headline}
       </p>
     </header>
