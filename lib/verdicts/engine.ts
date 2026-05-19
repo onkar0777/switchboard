@@ -29,6 +29,7 @@ export function headlineFor(
   goal: GoalConfig,
   actual: number,
   dragCount: number,
+  openCount: number = 0,
 ): string {
   const unitWord = pluralize(goal.target, goal.unit);
   let head = `${PREFIX[status]}: ${actual}/${goal.target} ${unitWord} this week.`;
@@ -36,6 +37,8 @@ export function headlineFor(
     const dragUnit = pluralize(dragCount, goal.unit);
     const verb = pluralize(dragCount, "is", "are");
     head += ` ${dragCount} ${dragUnit} ${verb} stale (waiting >${DRAG_THRESHOLD_HOURS}h).`;
+  } else if (actual === 0 && openCount === 0) {
+    head += " Nothing merged yet — the week is yours.";
   }
   return head;
 }
@@ -139,7 +142,7 @@ export async function computeVerdict(
 
   const actual = receipts.length;
   const status = statusFor(actual, goal.target);
-  const headline = headlineFor(status, goal, actual, drag.length);
+  const headline = headlineFor(status, goal, actual, drag.length, open.length);
   const momentum = bucketMomentum(allMerged, now);
   const mondayMove = pickMondayMove(drag, open, now);
 
