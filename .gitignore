@@ -10,3 +10,7 @@ node_modules/
 
 # Local agent planning artifacts
 docs/superpowers/plans/
+
+# Personal config override (loader prefers this when present)
+switchboard.config.local.ts
+.gstack/

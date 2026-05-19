@@ -49,6 +49,10 @@ SWITCHBOARD_FORCE_MOCK=1 npm run dev
 }
 ```
 
+For personal use without touching the committed default, copy
+`switchboard.config.ts` to `switchboard.config.local.ts` — it's gitignored, and
+the runtime prefers it when present.
+
 ## Verdict status bands
 
 | Ratio (actual / target) | Headline prefix |

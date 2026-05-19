@@ -86,6 +86,22 @@ describe("headlineFor", () => {
   it("does not append drag sentence when drag count = 0", () => {
     expect(headlineFor("shipped", goal, 5, 0)).toBe("Shipped: 5/5 PRs this week.");
   });
+
+  it("appends warm zero-state sentence when actual=0, no drag, no open PRs", () => {
+    expect(headlineFor("behind", goal, 0, 0, 0)).toBe(
+      "Behind: 0/5 PRs this week. Nothing merged yet — the week is yours.",
+    );
+  });
+
+  it("omits zero-state sentence when open PRs exist (Monday Move covers it)", () => {
+    expect(headlineFor("behind", goal, 0, 0, 2)).toBe("Behind: 0/5 PRs this week.");
+  });
+
+  it("drag sentence takes precedence over zero-state sentence at actual=0", () => {
+    expect(headlineFor("behind", goal, 0, 1, 0)).toBe(
+      "Behind: 0/5 PRs this week. 1 PR is stale (waiting >24h).",
+    );
+  });
 });
 
 function open(props: Partial<Receipt> & { id: string; prNumber: number }): Receipt {

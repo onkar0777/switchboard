@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import config from "@/switchboard.config";
+import config from "@/lib/config";
 import { computeVerdict } from "@/lib/verdicts/engine";
 import type { MCPAdapter } from "@/lib/mcp/adapter";
 import { MockAdapter } from "@/lib/mcp/mock";
