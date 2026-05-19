@@ -13,5 +13,5 @@ html {
 }
 
 body {
-  font-feature-settings: "ss01", "cv11";
+  letter-spacing: -0.005em;
 }
