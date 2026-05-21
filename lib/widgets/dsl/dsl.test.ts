@@ -227,3 +227,50 @@ describe("evaluate — compare + set", () => {
     expect(bag.y).toBe("yes");
   });
 });
+
+describe("evaluate — format mini-language", () => {
+  const ctx = { now: new Date("2026-05-06T12:00:00Z"), nowMs: Date.parse("2026-05-06T12:00:00Z"), target: 5 };
+
+  function fmt(template: string, setup: unknown[] = [], queries: Record<string, unknown> = {}) {
+    const bag = evaluate(parsePipeline([...setup, { op: "format", as: "out", template }]), { queries }, ctx as never);
+    return bag.out;
+  }
+
+  it("interpolates bag and ctx vars", () => {
+    expect(fmt("{actual}/{target}", [{ op: "set", as: "actual", to: { lit: 4 } }])).toBe("4/5");
+  });
+
+  it("plural modifier keys on value === 1", () => {
+    expect(fmt("{n:plural(PR|PRs)}", [{ op: "set", as: "n", to: { lit: 1 } }])).toBe("PR");
+    expect(fmt("{n:plural(PR|PRs)}", [{ op: "set", as: "n", to: { lit: 2 } }])).toBe("PRs");
+  });
+
+  it("map modifier substitutes by value (values may contain spaces)", () => {
+    expect(
+      fmt("{b:map(shipped=Shipped,on_track=On track,behind=Behind)}", [{ op: "set", as: "b", to: { lit: "on_track" } }]),
+    ).toBe("On track");
+  });
+
+  it("round and hoursSince modifiers on a current row", () => {
+    const out = fmt("{hoursSinceUpdate:round}h", [
+      { op: "select", from: "queries.r" },
+      { op: "first" },
+    ], { r: [{ hoursSinceUpdate: 49.6 }] });
+    expect(out).toBe("50h");
+    const out2 = fmt("{openedAt:hoursSince}h", [
+      { op: "select", from: "queries.o" },
+      { op: "first" },
+    ], { o: [{ openedAt: "2026-05-06T06:00:00Z" }] });
+    expect(out2).toBe("6h");
+  });
+
+  it("includes a conditional segment only when the flag is truthy", () => {
+    const tpl = "Base.{?drag} {dragCount} stale.{/drag}";
+    expect(fmt(tpl, [{ op: "set", as: "drag", to: { lit: true } }, { op: "set", as: "dragCount", to: { lit: 2 } }])).toBe(
+      "Base. 2 stale.",
+    );
+    expect(fmt(tpl, [{ op: "set", as: "drag", to: { lit: false } }, { op: "set", as: "dragCount", to: { lit: 0 } }])).toBe(
+      "Base.",
+    );
+  });
+});
