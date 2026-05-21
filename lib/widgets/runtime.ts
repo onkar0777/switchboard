@@ -59,3 +59,53 @@ export function validateDeeplinkFields(deeplink: DeeplinkConfig, sampleRow: Reco
     }
   }
 }
+
+import { evaluate, type DslContext, type PipelineInput } from "./dsl/evaluate";
+import type { Pipeline } from "./dsl/grammar";
+
+export interface RuntimeOutput {
+  verdict: string;
+  value: number | string | null;
+  status: CanonicalStatus;
+  state: WidgetState;
+  rows: Array<Record<string, unknown> & { deeplink: string }>;
+  slots: Record<string, unknown>;
+  momentum?: number[];
+}
+
+interface ExecutableSpec {
+  verdict: { pipeline: Pipeline };
+  deeplink: DeeplinkConfig;
+  render: { slots: Record<string, unknown> };
+}
+
+// Pure: runs the verdict pipeline, derives canonical status, builds per-row
+// deeplinks. No I/O — `data` is supplied by the fixture builder (Steps 2-3) or
+// the MCP client-manager (Step 4). State is "ok" here; failure states are set
+// by the caller (load-widget / data route) when a query or validation fails.
+export function execute(spec: ExecutableSpec, data: PipelineInput, ctx: DslContext): RuntimeOutput {
+  const bag = evaluate(spec.verdict.pipeline, data, ctx);
+
+  const rowSourceName = (spec.render.slots.from as string | undefined) ?? "receipts";
+  const rawRows = Array.isArray(bag[rowSourceName]) ? (bag[rowSourceName] as Record<string, unknown>[]) : [];
+  const rows = rawRows.map((row) => ({ ...row, deeplink: buildDeeplink(spec.deeplink, row) }));
+
+  const slots: Record<string, unknown> = {};
+  for (const [slot, source] of Object.entries(spec.render.slots)) {
+    if (slot === "from") continue;
+    slots[slot] = typeof source === "string" ? bag[source] : source;
+  }
+
+  const value = (bag.value as number | string | undefined) ?? null;
+  const verdict = typeof bag.verdict === "string" ? bag.verdict : "";
+
+  return {
+    verdict,
+    value,
+    status: mapStatus(bag.statusBand as string | undefined),
+    state: "ok",
+    rows,
+    slots,
+    momentum: Array.isArray(bag.momentum) ? (bag.momentum as number[]) : undefined,
+  };
+}
