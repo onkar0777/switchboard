@@ -42,6 +42,10 @@ function FailureState({ widget }: { widget: GridWidget }) {
 
 function WidgetCell({ widget }: { widget: GridWidget }) {
   // Color on status only when state === "ok" (DESIGN.md). Otherwise failure UX.
+  //
+  // Intentional v1.2 fallthrough: only "verdict_card" is implemented in this step.
+  // All other templates (scoreboard, list, single_stat) render FailureState here.
+  // Step 5 will replace this ternary with a template registry lookup.
   const body =
     widget.output.state === "ok" && widget.template === "verdict_card" ? (
       <VerdictCardTemplate output={{ ...widget.output, title: widget.title }} />
