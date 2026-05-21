@@ -14,3 +14,48 @@ const STATUS_MAP: Record<string, CanonicalStatus> = {
 export function mapStatus(band: string | undefined): CanonicalStatus {
   return (band !== undefined && STATUS_MAP[band]) || "neutral";
 }
+
+export interface DeeplinkConfig {
+  template: string;
+  fields: Record<string, string>;
+}
+
+export class DeeplinkValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DeeplinkValidationError";
+  }
+}
+
+function getPath(obj: unknown, path: string): unknown {
+  return path.split(".").reduce<unknown>((acc, key) => {
+    if (acc != null && typeof acc === "object") return (acc as Record<string, unknown>)[key];
+    return undefined;
+  }, obj);
+}
+
+function templateSlots(template: string): string[] {
+  return [...template.matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
+}
+
+export function buildDeeplink(deeplink: DeeplinkConfig, row: Record<string, unknown>): string {
+  return deeplink.template.replace(/\{(\w+)\}/g, (_m, slot: string) => {
+    const fieldPath = deeplink.fields[slot];
+    return fieldPath === undefined ? "" : String(getPath(row, fieldPath) ?? "");
+  });
+}
+
+// Save-time-style validation: every template slot must have a field mapping,
+// and every mapped field path must resolve on a representative row.
+export function validateDeeplinkFields(deeplink: DeeplinkConfig, sampleRow: Record<string, unknown>): void {
+  for (const slot of templateSlots(deeplink.template)) {
+    if (!(slot in deeplink.fields)) {
+      throw new DeeplinkValidationError(`deeplink template slot "{${slot}}" has no entry in deeplink.fields`);
+    }
+  }
+  for (const [slot, fieldPath] of Object.entries(deeplink.fields)) {
+    if (getPath(sampleRow, fieldPath) === undefined) {
+      throw new DeeplinkValidationError(`deeplink field "${slot}" -> "${fieldPath}" does not resolve on the row shape`);
+    }
+  }
+}
