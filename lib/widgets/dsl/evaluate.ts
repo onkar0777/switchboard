@@ -63,7 +63,16 @@ export function evalExpr(expr: Expr, scope: Scope): Value {
     const hay = evalExpr(expr.in[1], scope);
     return Array.isArray(hay) && hay.includes(evalExpr(expr.in[0], scope));
   }
-  if ("matches" in expr) return new RegExp(expr.matches[1]).test(String(evalExpr(expr.matches[0], scope)));
+  if ("matches" in expr) {
+    const pattern = expr.matches[1];
+    let re: RegExp;
+    try {
+      re = new RegExp(pattern);
+    } catch {
+      throw new DslEvalError(`invalid regex in matches: "${pattern}"`);
+    }
+    return re.test(String(evalExpr(expr.matches[0], scope)));
+  }
   if ("and" in expr) return expr.and.every((e) => truthy(evalExpr(e, scope)));
   if ("or" in expr) return expr.or.some((e) => truthy(evalExpr(e, scope)));
   if ("not" in expr) return !truthy(evalExpr(expr.not, scope));

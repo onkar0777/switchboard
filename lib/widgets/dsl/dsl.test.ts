@@ -99,6 +99,22 @@ describe("evaluate — collection ops", () => {
   it("throws DslEvalError selecting a missing query", () => {
     expect(() => run([{ op: "select", from: "queries.nope" }], { rows: ROWS })).toThrow(DslEvalError);
   });
+
+  it("selectBag restores a stashed array and reduce operates on the full set", () => {
+    const bag = run([
+      { op: "select", from: "queries.rows" },
+      { op: "stash", as: "saved" },
+      { op: "first" },
+      // current is now a single row; selectBag restores the full array
+      { op: "selectBag", from: "saved" },
+      { op: "reduce", as: "total", kind: "count" },
+    ], { rows: ROWS });
+    expect(bag.total).toBe(ROWS.length);
+  });
+
+  it("selectBag throws DslEvalError for a missing bag name", () => {
+    expect(() => run([{ op: "selectBag", from: "nope" }], {})).toThrow(DslEvalError);
+  });
 });
 
 describe("evaluate — reduce + bucket", () => {
@@ -225,6 +241,18 @@ describe("evaluate — compare + set", () => {
       ctx as never,
     );
     expect(bag.y).toBe("yes");
+  });
+});
+
+describe("evaluate — expr operators", () => {
+  it("matches throws DslEvalError for an invalid regex pattern", () => {
+    expect(() =>
+      run([
+        { op: "select", from: "queries.rows" },
+        { op: "filter", where: { matches: ["id", "[invalid("] } },
+        { op: "stash", as: "r" },
+      ], { rows: ROWS }),
+    ).toThrow(DslEvalError);
   });
 });
 
