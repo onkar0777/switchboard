@@ -152,3 +152,78 @@ describe("evaluate — reduce + bucket", () => {
     expect(bag.mo).toEqual([1, 2, 0, 2]);
   });
 });
+
+describe("evaluate — compare + set", () => {
+  const ctx = { now: new Date(), nowMs: Date.now(), target: 5 };
+  const BANDS = [
+    { min: 1.0, out: "shipped" },
+    { min: 0.8, out: "on_track" },
+    { min: 0.5, out: "nearly_there" },
+    { min: 0, out: "behind" },
+  ];
+
+  function band(actual: number, target: number) {
+    const bag = evaluate(
+      parsePipeline([
+        { op: "set", as: "actual", to: { lit: actual } },
+        { op: "compare", as: "b", left: "{actual}", right: { lit: target }, bands: BANDS },
+      ]),
+      { queries: {} },
+      ctx as never,
+    );
+    return bag.b;
+  }
+
+  it("bands a ratio high->low", () => {
+    expect(band(5, 5)).toBe("shipped");
+    expect(band(4, 5)).toBe("on_track"); // ratio 0.8
+    expect(band(3, 5)).toBe("nearly_there"); // 0.6
+    expect(band(1, 5)).toBe("behind"); // 0.2
+  });
+
+  it("returns the last band when right <= 0 (v1: target<=0 -> behind)", () => {
+    expect(band(3, 0)).toBe("behind");
+  });
+
+  it("set evaluates a boolean expression", () => {
+    const bag = evaluate(
+      parsePipeline([
+        { op: "set", as: "a", to: { lit: 0 } },
+        { op: "set", as: "b", to: { lit: 0 } },
+        { op: "set", as: "flag", to: { and: [{ eq: ["{a}", 0] }, { eq: ["{b}", 0] }] } },
+      ]),
+      { queries: {} },
+      ctx as never,
+    );
+    expect(bag.flag).toBe(true);
+  });
+
+  it("set evaluates a non-numeric eq + cond (drag-precedence pattern)", () => {
+    const bag = evaluate(
+      parsePipeline([
+        { op: "set", as: "dragMove", to: { lit: "Unblock x#1" } },
+        { op: "set", as: "openMove", to: { lit: "Push x#2" } },
+        {
+          op: "set",
+          as: "action",
+          to: { cond: [{ when: "{dragMove}", then: "{dragMove}" }, { when: "{openMove}", then: "{openMove}" }], else: { lit: "" } },
+        },
+      ]),
+      { queries: {} },
+      ctx as never,
+    );
+    expect(bag.action).toBe("Unblock x#1");
+  });
+
+  it("cond falls through to else when all when-clauses are falsy", () => {
+    const bag = evaluate(
+      parsePipeline([
+        { op: "set", as: "x", to: { lit: "" } },
+        { op: "set", as: "y", to: { cond: [{ when: "{x}", then: { lit: "no" } }], else: { lit: "yes" } } },
+      ]),
+      { queries: {} },
+      ctx as never,
+    );
+    expect(bag.y).toBe("yes");
+  });
+});
