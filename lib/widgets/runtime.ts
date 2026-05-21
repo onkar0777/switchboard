@@ -1,3 +1,6 @@
+import { evaluate, type DslContext, type PipelineInput } from "./dsl/evaluate";
+import type { Pipeline } from "./dsl/grammar";
+
 export type CanonicalStatus = "good" | "at_risk" | "behind" | "neutral";
 export type WidgetState = "ok" | "loading" | "error" | "empty" | "unauthorized";
 
@@ -59,9 +62,6 @@ export function validateDeeplinkFields(deeplink: DeeplinkConfig, sampleRow: Reco
     }
   }
 }
-
-import { evaluate, type DslContext, type PipelineInput } from "./dsl/evaluate";
-import type { Pipeline } from "./dsl/grammar";
 
 export interface RuntimeOutput {
   verdict: string;
