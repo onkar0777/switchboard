@@ -49,6 +49,7 @@ describe("parity gate: founder-pr-verdict spec vs v1 computeVerdict", () => {
     // receipts — same ids, same order; each deeplink == v1 row url
     const outReceiptIds = (out.slots.receipts as { id: string }[]).map((r) => r.id);
     expect(outReceiptIds).toEqual(v1.receipts.map((r) => r.id));
+    expect(out.rows.length).toBeGreaterThan(0);
     for (const row of out.rows) {
       const match = v1.receipts.find((r) => r.id === (row as unknown as { id: string }).id);
       expect(row.deeplink).toBe(match?.url);
