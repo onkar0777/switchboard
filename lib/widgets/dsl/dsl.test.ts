@@ -100,3 +100,55 @@ describe("evaluate — collection ops", () => {
     expect(() => run([{ op: "select", from: "queries.nope" }], { rows: ROWS })).toThrow(DslEvalError);
   });
 });
+
+describe("evaluate — reduce + bucket", () => {
+  const MERGED = [
+    { id: "x1", mergedAt: "2026-04-14T17:00:00Z" }, // wk0
+    { id: "x2", mergedAt: "2026-04-21T18:00:00Z" }, // wk1
+    { id: "x3", mergedAt: "2026-04-22T20:00:00Z" }, // wk1
+    { id: "x4", mergedAt: "2026-05-04T16:00:00Z" }, // wk3 (current)
+    { id: "x5", mergedAt: "2026-05-05T11:00:00Z" }, // wk3
+  ];
+  const ctx = {
+    now: new Date("2026-05-06T12:00:00Z"),
+    nowMs: Date.parse("2026-05-06T12:00:00Z"),
+    weekStartIso: "2026-05-04T00:00:00.000Z",
+  };
+
+  it("reduce count writes the array length to the bag", () => {
+    const bag = evaluate(
+      parsePipeline([{ op: "select", from: "queries.m" }, { op: "reduce", as: "n", kind: "count" }]),
+      { queries: { m: MERGED } },
+      ctx as never,
+    );
+    expect(bag.n).toBe(5);
+  });
+
+  it("reduce count of an empty collection is 0", () => {
+    const bag = evaluate(
+      parsePipeline([{ op: "select", from: "queries.m" }, { op: "reduce", as: "n", kind: "count" }]),
+      { queries: { m: [] } },
+      ctx as never,
+    );
+    expect(bag.n).toBe(0);
+  });
+
+  it("reduce sum totals a numeric field", () => {
+    const bag = evaluate(
+      parsePipeline([{ op: "select", from: "queries.r" }, { op: "reduce", as: "t", kind: "sum", field: "v" }]),
+      { queries: { r: [{ v: 2 }, { v: 3 }, { v: 5 }] } },
+      ctx as never,
+    );
+    expect(bag.t).toBe(10);
+  });
+
+  it("bucket buckets 4 trailing weeks anchored at weekStartIso", () => {
+    const bag = evaluate(
+      parsePipeline([{ op: "select", from: "queries.m" }, { op: "bucket", as: "mo", by: "weekOf:mergedAt", count: 4 }]),
+      { queries: { m: MERGED } },
+      ctx as never,
+    );
+    // wk0=1, wk1=2, wk2=0, wk3(current)=2
+    expect(bag.mo).toEqual([1, 2, 0, 2]);
+  });
+});
