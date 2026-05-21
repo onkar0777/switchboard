@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "1.0",
+  "id": "founder-pr-verdict",
+  "title": "Ship 5 PRs this week",
+  "size": "L",
+  "params": { "target": 5 },
+  "mcp": {
+    "server": "github",
+    "queries": {
+      "merged": {
+        "tool": "list_merged_prs",
+        "args": {
+          "repos": ["onkarsingh/switchboard", "onkarsingh/other-repo"],
+          "author": "onkarsingh",
+          "since": "{fourWeeksAgoIso}",
+          "until": "{weekEndIso}"
+        }
+      },
+      "open": {
+        "tool": "list_open_prs",
+        "args": {
+          "repos": ["onkarsingh/switchboard", "onkarsingh/other-repo"],
+          "author": "onkarsingh"
+        }
+      }
+    }
+  },
+  "verdict": {
+    "kind": "deterministic",
+    "pipeline": [
+      { "op": "select", "from": "queries.merged" },
+      { "op": "stash", "as": "mergedAll" },
+      { "op": "filter", "where": { "and": [
+        { "gte": ["mergedAt", "{weekStartIso}"] },
+        { "lte": ["mergedAt", "{weekEndIso}"] }
+      ] } },
+      { "op": "stash", "as": "receipts" },
+      { "op": "reduce", "as": "actual", "kind": "count" },
+      { "op": "set", "as": "value", "to": "{actual}" },
+
+      { "op": "selectBag", "from": "mergedAll" },
+      { "op": "bucket", "as": "momentum", "by": "weekOf:mergedAt", "count": 4 },
+
+      { "op": "select", "from": "queries.open" },
+      { "op": "stash", "as": "openAll" },
+      { "op": "reduce", "as": "openCount", "kind": "count" },
+
+      { "op": "selectBag", "from": "openAll" },
+      { "op": "filter", "where": { "gt": ["hoursSinceUpdate", 24] } },
+      { "op": "stash", "as": "drag" },
+      { "op": "reduce", "as": "dragCount", "kind": "count" },
+
+      { "op": "compare", "as": "statusBand", "left": "{actual}", "right": "{target}", "bands": [
+        { "min": 1.0, "out": "shipped" },
+        { "min": 0.8, "out": "on_track" },
+        { "min": 0.5, "out": "nearly_there" },
+        { "min": 0, "out": "behind" }
+      ] },
+
+      { "op": "selectBag", "from": "drag" },
+      { "op": "sort", "by": "hoursSinceUpdate", "dir": "desc" },
+      { "op": "first" },
+      { "op": "format", "as": "dragMove", "template": "Unblock {repo}#{prNumber} — stale {hoursSinceUpdate:round}h." },
+
+      { "op": "selectBag", "from": "openAll" },
+      { "op": "sort", "by": "openedAt", "dir": "desc" },
+      { "op": "first" },
+      { "op": "format", "as": "openMove", "template": "Push {repo}#{prNumber} — {openedAt:hoursSince}h since you opened it." },
+
+      { "op": "set", "as": "actionText", "to": { "cond": [
+        { "when": "{dragMove}", "then": "{dragMove}" },
+        { "when": "{openMove}", "then": "{openMove}" }
+      ], "else": { "lit": "" } } },
+
+      { "op": "set", "as": "showZeroState", "to": { "and": [
+        { "eq": ["{actual}", 0] },
+        { "eq": ["{openCount}", 0] },
+        { "eq": ["{dragCount}", 0] }
+      ] } },
+
+      { "op": "format", "as": "verdict", "template": "{statusBand:map(shipped=Shipped,on_track=On track,nearly_there=Halfway,behind=Behind)}: {actual}/{target} {target:plural(PR|PRs)} this week.{?dragCount} {dragCount} {dragCount:plural(PR|PRs)} {dragCount:plural(is|are)} stale (waiting >24h).{/dragCount}{?showZeroState} Nothing merged yet — the week is yours.{/showZeroState}" }
+    ]
+  },
+  "deeplink": {
+    "template": "https://github.com/{repo}/pull/{number}",
+    "fields": { "repo": "repo", "number": "prNumber" }
+  },
+  "refresh": { "mode": "on_view", "cacheSeconds": 3600 },
+  "render": {
+    "template": "verdict_card",
+    "slots": {
+      "from": "receipts",
+      "verdict": "verdict",
+      "receipts": "receipts",
+      "drag": "drag",
+      "momentum": "momentum",
+      "action": "actionText"
+    }
+  },
+  "authoredBy": {
+    "intent": "How am I doing against my weekly PR goal?",
+    "model": "claude-opus-4-7",
+    "timestamp": "2026-05-21T00:00:00.000Z"
+  }
+}
