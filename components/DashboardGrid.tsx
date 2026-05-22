@@ -54,10 +54,12 @@ function FailureState({ widget }: { widget: GridWidget }) {
 
 function WidgetCell({ widget }: { widget: GridWidget }) {
   // Render the authored template only when state === "ok" (color logic lives in
-  // each template); otherwise the failure-state UX. Authored order, no re-sort.
-  const Template = TEMPLATES[widget.template];
+  // each template); otherwise the failure-state UX. An unknown template name
+  // (e.g. from a future layout loader bypassing the zod parse) also falls back
+  // to FailureState rather than crashing the grid. Authored order, no re-sort.
+  const Template = TEMPLATES[widget.template] ?? null;
   const body =
-    widget.output.state === "ok" ? (
+    widget.output.state === "ok" && Template ? (
       <Template output={{ ...widget.output, title: widget.title }} />
     ) : (
       <FailureState widget={widget} />

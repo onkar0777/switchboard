@@ -60,5 +60,6 @@ describe("DashboardGrid", () => {
     render(<DashboardGrid widgets={[scoreboard]} />);
     expect(screen.getByText("42")).toBeTruthy();
     expect(screen.getByText(/12%/)).toBeTruthy();
+    expect(screen.getByText(/▲/)).toBeTruthy(); // delta arrow is unique to ScoreboardTemplate
   });
 });
