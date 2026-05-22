@@ -25,13 +25,36 @@ describe("ServerConfigSchema", () => {
 describe("loadServerConfig", () => {
   it("loads and parses mcp/<name>.json from the given dir", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "sb-mcp-"));
-    await writeFile(path.join(dir, "github.json"), JSON.stringify({ name: "github", transport: { type: "http", url: "https://example.com/mcp" } }));
-    const cfg = await loadServerConfig("github", dir);
-    expect(cfg.name).toBe("github");
-    await rm(dir, { recursive: true, force: true });
+    try {
+      await writeFile(path.join(dir, "github.json"), JSON.stringify({ name: "github", transport: { type: "http", url: "https://example.com/mcp" } }));
+      const cfg = await loadServerConfig("github", dir);
+      expect(cfg.name).toBe("github");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("throws McpUnavailableError when the config file is missing", async () => {
     await expect(loadServerConfig("nope", path.join(tmpdir(), "does-not-exist-sb"))).rejects.toBeInstanceOf(McpUnavailableError);
+  });
+
+  it("throws McpUnavailableError when the config file contains non-JSON content", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "sb-mcp-"));
+    try {
+      await writeFile(path.join(dir, "bad.json"), "not-json");
+      await expect(loadServerConfig("bad", dir)).rejects.toBeInstanceOf(McpUnavailableError);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("throws McpUnavailableError when the config file fails schema validation", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "sb-mcp-"));
+    try {
+      await writeFile(path.join(dir, "invalid.json"), JSON.stringify({ name: "x" }));
+      await expect(loadServerConfig("invalid", dir)).rejects.toBeInstanceOf(McpUnavailableError);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

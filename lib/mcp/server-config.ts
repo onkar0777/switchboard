@@ -29,17 +29,17 @@ export async function loadServerConfig(name: string, dir = path.join(process.cwd
   try {
     raw = await readFile(file, "utf8");
   } catch {
-    throw new McpUnavailableError(name, `no MCP config at mcp/${name}.json`);
+    throw new McpUnavailableError(name, `no MCP config at ${file}`);
   }
   let json: unknown;
   try {
     json = JSON.parse(raw);
   } catch {
-    throw new McpUnavailableError(name, `mcp/${name}.json is not valid JSON`);
+    throw new McpUnavailableError(name, `${file} is not valid JSON`);
   }
   const parsed = ServerConfigSchema.safeParse(json);
   if (!parsed.success) {
-    throw new McpUnavailableError(name, `mcp/${name}.json is invalid: ${parsed.error.message}`);
+    throw new McpUnavailableError(name, `${file} is invalid: ${parsed.error.message}`);
   }
   return parsed.data;
 }
