@@ -1,5 +1,10 @@
+import type { JSX } from "react";
 import type { RuntimeOutput } from "@/lib/widgets/runtime";
 import { VerdictCardTemplate } from "@/components/widget-templates/VerdictCardTemplate";
+import { ScoreboardTemplate } from "@/components/widget-templates/ScoreboardTemplate";
+import { ListTemplate } from "@/components/widget-templates/ListTemplate";
+import { SingleStatTemplate } from "@/components/widget-templates/SingleStatTemplate";
+import type { WidgetOutput } from "@/components/widget-templates/types";
 import { EYEBROW } from "@/lib/design-tokens";
 
 export interface GridWidget {
@@ -15,6 +20,13 @@ const SPAN: Record<GridWidget["size"], string> = {
   S: "col-span-1 md:col-span-1",
   M: "col-span-1 md:col-span-2",
   L: "col-span-4 md:col-span-4",
+};
+
+const TEMPLATES: Record<GridWidget["template"], (props: { output: WidgetOutput }) => JSX.Element> = {
+  verdict_card: VerdictCardTemplate,
+  scoreboard: ScoreboardTemplate,
+  list: ListTemplate,
+  single_stat: SingleStatTemplate,
 };
 
 function FailureState({ widget }: { widget: GridWidget }) {
@@ -41,14 +53,12 @@ function FailureState({ widget }: { widget: GridWidget }) {
 }
 
 function WidgetCell({ widget }: { widget: GridWidget }) {
-  // Color on status only when state === "ok" (DESIGN.md). Otherwise failure UX.
-  //
-  // Intentional v1.2 fallthrough: only "verdict_card" is implemented in this step.
-  // All other templates (scoreboard, list, single_stat) render FailureState here.
-  // Step 5 will replace this ternary with a template registry lookup.
+  // Render the authored template only when state === "ok" (color logic lives in
+  // each template); otherwise the failure-state UX. Authored order, no re-sort.
+  const Template = TEMPLATES[widget.template];
   const body =
-    widget.output.state === "ok" && widget.template === "verdict_card" ? (
-      <VerdictCardTemplate output={{ ...widget.output, title: widget.title }} />
+    widget.output.state === "ok" ? (
+      <Template output={{ ...widget.output, title: widget.title }} />
     ) : (
       <FailureState widget={widget} />
     );
