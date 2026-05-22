@@ -28,7 +28,7 @@ export function ListTemplate({ output }: { output: WidgetOutput }) {
       {rows.length === 0 ? (
         <p className="border border-dashed border-stone-300 px-4 py-3 text-sm text-stone-500">Nothing to show.</p>
       ) : (
-        <ul className="divide-y divide-stone-100">
+        <ul className="divide-y divide-stone-200">
           {rows.map((r) => (
             <li key={String(r.id)}>
               <a
@@ -37,11 +37,11 @@ export function ListTemplate({ output }: { output: WidgetOutput }) {
                 rel="noreferrer"
                 className="flex items-baseline justify-between gap-4 py-3 hover:bg-stone-50"
               >
-                <span className="font-serif text-[17px] font-medium leading-snug text-stone-900 underline decoration-stone-300 underline-offset-2">
+                <span className="font-serif text-[15px] font-medium leading-[1.35] text-stone-900 underline decoration-stone-300 underline-offset-2">
                   {r.title}
                 </span>
                 {r.meta != null ? (
-                  <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-stone-500">
+                  <span className="shrink-0 font-sans text-[11px] uppercase tracking-wider text-stone-500">
                     {String(r.meta)}
                   </span>
                 ) : null}

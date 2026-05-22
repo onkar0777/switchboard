@@ -31,4 +31,9 @@ describe("ListTemplate", () => {
     render(<ListTemplate output={{ ...output, rows: [], slots: { verdict: "Nothing waiting" } }} />);
     expect(screen.getByText(/Nothing to show/)).toBeTruthy();
   });
+
+  it("does not apply status color when state !== ok", () => {
+    render(<ListTemplate output={{ ...output, state: "error" }} />);
+    expect(screen.getByText("2 reviews waiting on you").className).not.toContain("amber-600");
+  });
 });
