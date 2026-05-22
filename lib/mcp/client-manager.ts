@@ -10,7 +10,7 @@ const DEFAULT_CAP = 4;
 const DEFAULT_RETRIES = 1;
 
 export interface McpRunner {
-  listToolNames(): Promise<string[]>;
+  listToolNames(opts?: { signal?: AbortSignal }): Promise<string[]>;
   callTool(name: string, args: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<unknown>;
   close(): Promise<void>;
 }
@@ -51,6 +51,7 @@ export function makeRunner(client: Client, opts: RunnerOpts): McpRunner {
     try {
       return await client.callTool({ name, arguments: args }, undefined, { signal, timeout: timeoutMs });
     } catch (err) {
+      if (signal?.aborted) throw signal.reason ?? err; // preserve external abort reason (e.g. McpBudgetError)
       const msg = err instanceof Error ? err.message : String(err);
       if (/timed out|timeout|-32001/i.test(msg)) throw new McpTimeoutError(opts.serverName, name);
       throw err;
@@ -58,8 +59,8 @@ export function makeRunner(client: Client, opts: RunnerOpts): McpRunner {
   }
 
   return {
-    async listToolNames() {
-      const res = await client.listTools();
+    async listToolNames(listOpts) {
+      const res = await client.listTools(undefined, { signal: listOpts?.signal, timeout: timeoutMs });
       return res.tools.map((t) => t.name);
     },
     async callTool(name, args, callOpts) {
@@ -67,6 +68,7 @@ export function makeRunner(client: Client, opts: RunnerOpts): McpRunner {
       try {
         let lastErr: unknown;
         for (let attempt = 0; attempt <= retries; attempt++) {
+          if (callOpts?.signal?.aborted) throw callOpts.signal.reason ?? new Error("aborted");
           try {
             const res = (await callOnce(name, args, callOpts?.signal)) as {
               isError?: boolean;

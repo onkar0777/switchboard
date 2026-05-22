@@ -36,7 +36,7 @@ describe("makeRunner", () => {
     const client = await connectFake((s) => {
       s.registerTool("echo", { inputSchema: { msg: z.string() } }, async (a) => ({ content: [{ type: "text", text: JSON.stringify([{ got: a.msg }]) }] }));
     });
-    const runner = makeRunner(client, { serverName: "fake" });
+    const runner = makeRunner(client, { serverName: "fake-echo" });
     expect(await runner.listToolNames()).toContain("echo");
     const res = (await runner.callTool("echo", { msg: "hi" })) as { content: Array<{ text: string }> };
     expect(res.content[0].text).toBe(JSON.stringify([{ got: "hi" }]));
@@ -52,7 +52,7 @@ describe("makeRunner", () => {
         return { content: [{ type: "text", text: "[]" }] };
       });
     });
-    const runner = makeRunner(client, { serverName: "fake", retries: 1 });
+    const runner = makeRunner(client, { serverName: "fake-flaky", retries: 1 });
     await runner.callTool("flaky", {});
     expect(calls).toBe(2);
     await runner.close();
@@ -65,8 +65,24 @@ describe("makeRunner", () => {
         return { content: [{ type: "text", text: "[]" }] };
       });
     });
-    const runner = makeRunner(client, { serverName: "fake", timeoutMs: 30, retries: 0 });
+    const runner = makeRunner(client, { serverName: "fake-slow", timeoutMs: 30, retries: 0 });
     await expect(runner.callTool("slow", {})).rejects.toBeInstanceOf(McpTimeoutError);
+    await runner.close();
+  });
+
+  it("rejects with the external abort reason (not McpTimeoutError) when the signal aborts", async () => {
+    const client = await connectFake((s) => {
+      s.registerTool("hang", { inputSchema: {} }, async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return { content: [{ type: "text", text: "[]" }] };
+      });
+    });
+    const runner = makeRunner(client, { serverName: "fake-abort", timeoutMs: 5000, retries: 0 });
+    const controller = new AbortController();
+    const promise = runner.callTool("hang", {}, { signal: controller.signal });
+    setTimeout(() => controller.abort(new Error("budget tripped")), 10);
+    await expect(promise).rejects.toThrow("budget tripped");
+    await expect(promise).rejects.not.toBeInstanceOf(McpTimeoutError);
     await runner.close();
   });
 });
