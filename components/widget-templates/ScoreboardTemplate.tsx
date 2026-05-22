@@ -2,7 +2,7 @@ import type { WidgetOutput } from "./types";
 import { STATUS_TEXT } from "@/lib/widgets/status-tokens";
 import { EYEBROW } from "@/lib/design-tokens";
 
-// Numeric headline + delta. Big mono numeral (DESIGN.md card stat), Fraunces
+// Numeric headline + delta. Big mono numeral (DESIGN.md hero stat, 32px), Fraunces
 // headline colored by status only when state === "ok".
 export function ScoreboardTemplate({ output }: { output: WidgetOutput }) {
   const colored = output.state === "ok";
@@ -19,7 +19,7 @@ export function ScoreboardTemplate({ output }: { output: WidgetOutput }) {
       <p className="font-mono text-[32px] leading-none tabular-nums text-stone-900">
         {value}
         {deltaPct != null ? (
-          <span className={`ml-3 font-mono text-[18px] ${deltaColor}`}>
+          <span className={`ml-3 text-[18px] ${deltaColor}`}>
             {deltaArrow} {Math.abs(deltaPct)}%
           </span>
         ) : null}
