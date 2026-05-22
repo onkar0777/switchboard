@@ -1,0 +1,7 @@
+{
+  "name": "github",
+  "transport": {
+    "type": "http",
+    "url": "https://example.invalid/github-mcp"
+  }
+}
