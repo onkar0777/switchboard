@@ -31,6 +31,8 @@ export class Semaphore {
 const pool = new Map<string, Semaphore>();
 
 // One semaphore per server name, shared across widget-loads in the process.
+// First registration wins: the `max` is fixed when the key is first seen; later
+// calls with the same key reuse that instance and ignore a different `max`.
 export function semaphoreFor(key: string, max: number): Semaphore {
   let s = pool.get(key);
   if (!s) {
