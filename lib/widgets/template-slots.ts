@@ -20,6 +20,10 @@ const VerdictCardSlots = z
   })
   .passthrough();
 
+// All fields optional by design: the scoreboard template falls back to top-level
+// output fields (verdict/value) when a slot is absent (plan D4). validateSlots
+// enforces shape only, not semantic completeness — `{}` is a structurally valid
+// (if blank) scoreboard, not a validation error.
 const ScoreboardSlots = z
   .object({
     headline: z.string().optional(),
