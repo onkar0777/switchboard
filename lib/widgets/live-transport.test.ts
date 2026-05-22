@@ -6,6 +6,8 @@ import { buildMcpData } from "@/lib/widgets/mcp-data";
 import { buildContext } from "@/lib/widgets/ctx";
 import { WidgetSpecSchema } from "@/lib/widgets/spec";
 import { loadWidget } from "@/lib/widgets/load-widget";
+import { describeMcpError } from "@/lib/mcp/errors";
+import type { ServerConfig } from "@/lib/mcp/server-config";
 import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
 
 const NOW = new Date("2026-05-20T12:00:00.000Z");
@@ -59,5 +61,15 @@ describe("Tier 4 — live transport acceptance", () => {
     expect(widget.output.state).toBe("empty");
     expect(widget.errorMessage).toBeUndefined();
   });
-  it.todo("AC4: an unreachable MCP url surfaces as 'Couldn't compute: fetch failed'");
+  it("AC4: an unreachable MCP url surfaces as 'Couldn't compute: fetch failed'", async () => {
+    const unreachable: ServerConfig = {
+      name: "github",
+      transport: { type: "http", url: "https://example.invalid/github-mcp" },
+    };
+    // The real client-manager attempts a real fetch and rejects fast.
+    const err = await openRunner(unreachable).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toMatch(/fetch failed/i);
+    expect(describeMcpError(err, "github")).toBe("Couldn't compute: fetch failed");
+  });
 });
