@@ -23,7 +23,7 @@ describe("loadFounderWidget", () => {
     delete process.env.SWITCHBOARD_FORCE_MOCK; // exercise the live path's catch
     vi.resetModules();
     vi.doMock("./mcp-data", () => ({
-      buildMcpData: () => {
+      buildMcpData: async () => {
         throw new Error("boom: MCP unreachable");
       },
     }));
