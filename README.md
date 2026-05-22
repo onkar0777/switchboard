@@ -78,11 +78,14 @@ If any open PR has gone untouched for >24h, a Drag suffix appears
 
 - `lib/verdicts/engine.ts` — pure functions (`statusFor`, `headlineFor`,
   `pickMondayMove`, `bucketMomentum`, `computeVerdict`).
-- `lib/mcp/adapter.ts` — `MCPAdapter` interface. v1 ships
-  `OctokitGitHubAdapter` (REST search) and `MockAdapter`. v1.1 swaps in a real
-  GitHub MCP server.
-- `app/api/verdict/route.ts` — single GET endpoint, recomputes on every request.
-- `app/page.tsx` — renders `Verdict` JSON into the poster.
+- `lib/mcp/adapter.ts` — `MCPAdapter` interface. `MockAdapter` backs the parity
+  oracle and the `SWITCHBOARD_FORCE_MOCK=1` data path. Live data flows through a
+  real MCP server: `lib/mcp/client-manager.ts` (transport, timeout, retry,
+  concurrency cap) feeding `lib/widgets/mcp-data.ts`, configured per
+  `mcp/<server>.json`.
+- `lib/widgets/load-widget.ts` — loads a widget server-side (spec → MCP data →
+  pure runtime), deriving the widget `state`.
+- `app/page.tsx` — renders widgets through the runtime into the dashboard grid.
 
 ## Non-goals (v1)
 
