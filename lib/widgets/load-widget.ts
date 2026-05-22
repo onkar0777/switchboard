@@ -3,6 +3,7 @@ import { parsePipeline } from "./dsl";
 import { buildContext } from "./ctx";
 import { buildMcpData } from "./mcp-data";
 import { execute, validateDeeplinkFields, type WidgetState } from "./runtime";
+import { validateSlots, type TemplateName } from "./template-slots";
 import { describeMcpError } from "@/lib/mcp/errors";
 import type { GridWidget } from "@/components/DashboardGrid";
 import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
@@ -30,6 +31,7 @@ export async function loadWidget(spec: WidgetSpec, now: Date = new Date()): Prom
       data,
       ctx,
     );
+    validateSlots(spec.render.template as TemplateName, output.slots);
     const state: WidgetState = allEmpty(data.queries) ? "empty" : "ok";
     return { id: spec.id, title: spec.title, size: spec.size, template: spec.render.template, output: { ...output, state } };
   } catch (err) {
