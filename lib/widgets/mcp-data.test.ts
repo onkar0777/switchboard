@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseToolResult, buildMcpData } from "./mcp-data";
+import { parseToolResult, buildMcpData, BUDGET_MS } from "./mcp-data";
 import { buildContext } from "./ctx";
 import { WidgetSpecSchema } from "./spec";
 import { McpBudgetError, McpDriftError } from "@/lib/mcp/errors";
@@ -62,7 +62,7 @@ describe("buildMcpData", () => {
     };
     const promise = buildMcpData(spec, buildContext(spec, NOW), { runner });
     const assertion = expect(promise).rejects.toBeInstanceOf(McpBudgetError);
-    await vi.advanceTimersByTimeAsync(45_000);
+    await vi.advanceTimersByTimeAsync(BUDGET_MS + 1);
     await assertion;
   });
 });

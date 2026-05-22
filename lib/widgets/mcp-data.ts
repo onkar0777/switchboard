@@ -5,7 +5,7 @@ import { loadServerConfig } from "@/lib/mcp/server-config";
 import { openRunner, type McpRunner } from "@/lib/mcp/client-manager";
 import { McpBudgetError, McpDriftError } from "@/lib/mcp/errors";
 
-const BUDGET_MS = 45_000;
+export const BUDGET_MS = 45_000;
 
 // Normalizes an MCP tool result into an array of row objects. Accepts a bare
 // JSON array, the common {rows|items|results|data} wrappers, or structuredContent.
