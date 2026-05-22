@@ -25,6 +25,13 @@ describe("chooseTransport", () => {
     const cfg: ServerConfig = { name: "x", transport: { type: "http", url: "http://localhost:9/mcp" } };
     expect(chooseTransport(cfg)).toBeInstanceOf(StreamableHTTPClientTransport);
   });
+  it("picks Streamable HTTP and constructs cleanly with configured headers", () => {
+    const cfg: ServerConfig = {
+      name: "x",
+      transport: { type: "http", url: "http://localhost:9/mcp", headers: { Authorization: "Bearer x" } },
+    };
+    expect(chooseTransport(cfg)).toBeInstanceOf(StreamableHTTPClientTransport);
+  });
   it("picks stdio for a command config", () => {
     const cfg: ServerConfig = { name: "x", transport: { type: "stdio", command: "node", args: [] } };
     expect(chooseTransport(cfg)).toBeInstanceOf(StdioClientTransport);

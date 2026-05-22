@@ -24,7 +24,9 @@ interface RunnerOpts {
 
 export function chooseTransport(config: ServerConfig): StreamableHTTPClientTransport | StdioClientTransport {
   if (config.transport.type === "http") {
-    return new StreamableHTTPClientTransport(new URL(config.transport.url));
+    return new StreamableHTTPClientTransport(new URL(config.transport.url), {
+      requestInit: config.transport.headers ? { headers: config.transport.headers } : undefined,
+    });
   }
   return new StdioClientTransport({
     command: config.transport.command,

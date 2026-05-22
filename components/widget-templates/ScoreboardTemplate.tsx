@@ -19,7 +19,7 @@ export function ScoreboardTemplate({ output }: { output: WidgetOutput }) {
       <p className="font-mono text-[32px] leading-none tabular-nums text-stone-900">
         {value}
         {deltaPct != null ? (
-          <span className={`ml-3 text-[18px] ${deltaColor}`}>
+          <span className={`ml-3 font-mono text-[18px] tabular-nums ${deltaColor}`}>
             {deltaArrow} {Math.abs(deltaPct)}%
           </span>
         ) : null}
