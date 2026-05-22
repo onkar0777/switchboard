@@ -5,6 +5,7 @@ import { openRunner, type McpRunner } from "@/lib/mcp/client-manager";
 import { buildMcpData } from "@/lib/widgets/mcp-data";
 import { buildContext } from "@/lib/widgets/ctx";
 import { WidgetSpecSchema } from "@/lib/widgets/spec";
+import { loadWidget } from "@/lib/widgets/load-widget";
 import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
 
 const NOW = new Date("2026-05-20T12:00:00.000Z");
@@ -41,7 +42,22 @@ describe("Tier 4 — live transport acceptance", () => {
     expect(data.queries.open).toEqual([]);
   });
 
-  it.todo("AC2: loadWidget over real transport yields state=ok and a 'Shipped: 5/5' verdict");
-  it.todo("AC3: loadWidget over real transport with no data yields state=empty and no error");
+  it("AC2: loadWidget over real transport yields state=ok and a 'Shipped: 5/5' verdict", async () => {
+    stub = await startStubMcpServer(registerGithubStub({ merged: mergedRows, open: [] }));
+    runner = await openRunner(stub.config);
+    const widget = await loadWidget(spec, NOW, { runner });
+    expect(widget.output.state).toBe("ok");
+    expect(widget.output.value).toBe(5);
+    expect(widget.output.verdict).toContain("Shipped: 5/5");
+    expect(widget.errorMessage).toBeUndefined();
+  });
+
+  it("AC3: loadWidget over real transport with no data yields state=empty and no error", async () => {
+    stub = await startStubMcpServer(registerGithubStub({ merged: [], open: [] }));
+    runner = await openRunner(stub.config);
+    const widget = await loadWidget(spec, NOW, { runner });
+    expect(widget.output.state).toBe("empty");
+    expect(widget.errorMessage).toBeUndefined();
+  });
   it.todo("AC4: an unreachable MCP url surfaces as 'Couldn't compute: fetch failed'");
 });

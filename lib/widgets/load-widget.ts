@@ -5,6 +5,7 @@ import { buildMcpData } from "./mcp-data";
 import { execute, validateDeeplinkFields, type WidgetState } from "./runtime";
 import { validateSlots, type TemplateName } from "./template-slots";
 import { describeMcpError } from "@/lib/mcp/errors";
+import type { McpRunner } from "@/lib/mcp/client-manager";
 import type { GridWidget } from "@/components/DashboardGrid";
 import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
 
@@ -15,10 +16,14 @@ function allEmpty(queries: Record<string, unknown>): boolean {
 
 // Generic widget loader: spec -> ctx -> live MCP data (or mock under FORCE_MOCK)
 // -> runtime. Derives `state` here (the runtime stays pure and always emits "ok").
-export async function loadWidget(spec: WidgetSpec, now: Date = new Date()): Promise<GridWidget> {
+export async function loadWidget(
+  spec: WidgetSpec,
+  now: Date = new Date(),
+  opts: { runner?: McpRunner } = {},
+): Promise<GridWidget> {
   try {
     const ctx = buildContext(spec, now);
-    const data = await buildMcpData(spec, ctx);
+    const data = await buildMcpData(spec, ctx, opts);
 
     // Save-time-style deeplink check against the first non-empty row, if any.
     const firstRows = Object.values(data.queries).find((v) => Array.isArray(v) && v.length > 0) as
