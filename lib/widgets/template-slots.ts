@@ -39,10 +39,13 @@ const ListSlots = z
   })
   .passthrough();
 
+// value/label optional by design: SingleStatTemplate falls back to top-level
+// output.value / output.title when the slot is absent (same fallback contract as
+// ScoreboardSlots, plan D4). validateSlots enforces shape, not completeness.
 const SingleStatSlots = z
   .object({
-    value: z.union([z.number(), z.string()]),
-    label: z.string(),
+    value: z.union([z.number(), z.string()]).optional(),
+    label: z.string().optional(),
     verdict: z.string().optional(),
   })
   .passthrough();

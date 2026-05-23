@@ -62,8 +62,19 @@ export function makeRunner(client: Client, opts: RunnerOpts): McpRunner {
 
   return {
     async listToolNames(listOpts) {
-      const res = await client.listTools(undefined, { signal: listOpts?.signal, timeout: timeoutMs });
-      return res.tools.map((t) => t.name);
+      // Page through tools/list so drift detection sees every tool, not just the
+      // first page (servers like GitHub's expose dozens and may paginate).
+      const names: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const res = await client.listTools(cursor ? { cursor } : undefined, {
+          signal: listOpts?.signal,
+          timeout: timeoutMs,
+        });
+        for (const t of res.tools) names.push(t.name);
+        cursor = res.nextCursor;
+      } while (cursor);
+      return names;
     },
     async callTool(name, args, callOpts) {
       const release = await sem.acquire();

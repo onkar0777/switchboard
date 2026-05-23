@@ -26,19 +26,21 @@ export async function loadWidget(
     const ctx = buildContext(spec, now);
     const data = await buildMcpData(spec, ctx, opts);
 
-    // Save-time-style deeplink check against the first non-empty row, if any.
-    const firstRows = Object.values(data.queries).find((v) => Array.isArray(v) && v.length > 0) as
-      | Record<string, unknown>[]
-      | undefined;
-    if (firstRows?.[0]) validateDeeplinkFields(spec.deeplink, firstRows[0]);
-
     const output = execute(
       { verdict: { pipeline: parsePipeline(spec.verdict.pipeline) }, deeplink: spec.deeplink, render: spec.render },
       data,
       ctx,
     );
+
+    // Save-time-style deeplink check against an actually-rendered row (the row
+    // set the widget renders, not an unrelated non-empty query), if any.
+    if (output.rows[0]) validateDeeplinkFields(spec.deeplink, output.rows[0]);
     validateSlots(spec.render.template as TemplateName, output.slots);
-    const state: WidgetState = allEmpty(data.queries) ? "empty" : "ok";
+
+    // "empty" only suppresses templates that have nothing to show without rows
+    // (list). Verdict-computing templates render their authored zero verdict
+    // (e.g. "Behind: 0/5 … the week is yours.") even when every query is empty.
+    const state: WidgetState = spec.render.template === "list" && allEmpty(data.queries) ? "empty" : "ok";
     return { id: spec.id, title: spec.title, size: spec.size, template: spec.render.template, output: { ...output, state } };
   } catch (err) {
     return {

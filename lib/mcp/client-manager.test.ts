@@ -50,6 +50,21 @@ describe("makeRunner", () => {
     await runner.close();
   });
 
+  it("pages through tools/list via nextCursor so drift detection sees later-page tools", async () => {
+    // A server that returns the needed tool only on the second page. The runner
+    // must follow nextCursor, or drift detection would falsely reject the widget.
+    const pages = [
+      { tools: [{ name: "a" }, { name: "b" }], nextCursor: "page2" },
+      { tools: [{ name: "search_pull_requests" }] },
+    ];
+    const fakeClient = {
+      listTools: async (params?: { cursor?: string }) => (params?.cursor === "page2" ? pages[1] : pages[0]),
+      close: async () => {},
+    } as unknown as Client;
+    const runner = makeRunner(fakeClient, { serverName: "fake-paged" });
+    expect(await runner.listToolNames()).toEqual(["a", "b", "search_pull_requests"]);
+  });
+
   it("retries once on a transient error then succeeds", async () => {
     let calls = 0;
     const client = await connectFake((s) => {

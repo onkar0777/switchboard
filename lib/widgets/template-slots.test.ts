@@ -22,7 +22,14 @@ describe("validateSlots", () => {
     expect(() => validateSlots("list", { rows: [] })).toThrow(SlotValidationError);
   });
 
-  it("rejects a single_stat slot set missing the label", () => {
-    expect(() => validateSlots("single_stat", { value: 7 })).toThrow(SlotValidationError);
+  it("accepts a single_stat slot set relying on the value/label fallbacks", () => {
+    // SingleStatTemplate falls back to output.value / output.title when these
+    // slots are absent (plan D4) — validateSlots must not reject the shape.
+    expect(() => validateSlots("single_stat", {})).not.toThrow();
+    expect(() => validateSlots("single_stat", { value: 7 })).not.toThrow();
+  });
+
+  it("rejects a single_stat slot with a wrong-typed value", () => {
+    expect(() => validateSlots("single_stat", { value: { nope: true } })).toThrow(SlotValidationError);
   });
 });

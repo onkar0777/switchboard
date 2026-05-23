@@ -54,11 +54,16 @@ describe("Tier 4 — live transport acceptance", () => {
     expect(widget.errorMessage).toBeUndefined();
   });
 
-  it("AC3: loadWidget over real transport with no data yields state=empty and no error", async () => {
+  it("AC3: loadWidget over real transport with no data renders the authored zero verdict (state=ok)", async () => {
+    // The founder verdict_card computes a meaningful verdict from zero — it is
+    // not suppressed to state=empty (that's reserved for the `list` template).
     stub = await startStubMcpServer(registerGithubStub({ merged: [], open: [] }));
     runner = await openRunner(stub.config);
     const widget = await loadWidget(spec, NOW, { runner });
-    expect(widget.output.state).toBe("empty");
+    expect(widget.output.state).toBe("ok");
+    expect(widget.output.value).toBe(0);
+    expect(widget.output.verdict).toContain("Behind: 0/5");
+    expect(widget.output.verdict).toContain("the week is yours");
     expect(widget.errorMessage).toBeUndefined();
   });
   it("AC4: an unreachable MCP url surfaces as 'Couldn't compute: fetch failed'", async () => {
