@@ -7,4 +7,4 @@ export const STATUS_TONE: Record<VerdictStatus, string> = {
   behind: "text-rose-700",
 };
 
-export const EYEBROW = "text-[11px] uppercase tracking-[0.12em] text-stone-600 font-medium";
+export const EYEBROW = "text-[12px] uppercase tracking-[0.08em] text-stone-600 font-medium";

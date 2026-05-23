@@ -15,10 +15,13 @@ git clone https://github.com/onkarsingh/switchboard
 cd switchboard
 npm install
 
-# Generate a GitHub token with the LEAST scopes you need:
+# Switchboard reads your PR activity through GitHub's official remote MCP server
+# (https://api.githubcopilot.com/mcp/). Supply a GitHub Personal Access Token —
+# it's the only secret you provide. Generate one with the LEAST scopes you need:
 #   public_repo + read:user   (personal use, public repos)
-#   repo:read + read:user     (if scanning private repos)
-export GITHUB_TOKEN=ghp_xxx
+#   repo + read:user          (if scanning private repos)
+cp .env.example .env.local
+$EDITOR .env.local            # set GITHUB_PAT=ghp_xxx  (.env.local is gitignored)
 
 # Edit your goals:
 $EDITOR switchboard.config.ts
@@ -26,6 +29,11 @@ $EDITOR switchboard.config.ts
 npm run dev
 # open http://localhost:8000
 ```
+
+The token is interpolated into the `Authorization: Bearer` header defined in
+`mcp/github.json` at request time. If `GITHUB_PAT` is unset, the dashboard widget
+reports "Can't reach the github MCP server" instead of rendering — set the token,
+or use the mock path below.
 
 ## Try it without a token (mock data)
 
@@ -67,9 +75,10 @@ If any open PR has gone untouched for >24h, a Drag suffix appears
 
 ## Security model
 
-- `GITHUB_TOKEN` is read from the environment only. Never written to disk, never
-  logged, never sent off-host.
-- No telemetry. No analytics. No remote calls except to `api.github.com`.
+- `GITHUB_PAT` is read from the environment only (via `.env.local` or your shell).
+  Never written to disk by the app, never logged, never sent anywhere except as
+  the `Authorization` header to the GitHub MCP server.
+- No telemetry. No analytics. No remote calls except to `api.githubcopilot.com`.
 - All data is computed in-process. No persistence in v1.
 - Server runs on `localhost`. No public binding by default.
 - All operations are read-only.
@@ -78,11 +87,14 @@ If any open PR has gone untouched for >24h, a Drag suffix appears
 
 - `lib/verdicts/engine.ts` — pure functions (`statusFor`, `headlineFor`,
   `pickMondayMove`, `bucketMomentum`, `computeVerdict`).
-- `lib/mcp/adapter.ts` — `MCPAdapter` interface. v1 ships
-  `OctokitGitHubAdapter` (REST search) and `MockAdapter`. v1.1 swaps in a real
-  GitHub MCP server.
-- `app/api/verdict/route.ts` — single GET endpoint, recomputes on every request.
-- `app/page.tsx` — renders `Verdict` JSON into the poster.
+- `lib/mcp/adapter.ts` — `MCPAdapter` interface. `MockAdapter` backs the parity
+  oracle and the `SWITCHBOARD_FORCE_MOCK=1` data path. Live data flows through a
+  real MCP server: `lib/mcp/client-manager.ts` (transport, timeout, retry,
+  concurrency cap) feeding `lib/widgets/mcp-data.ts`, configured per
+  `mcp/<server>.json`.
+- `lib/widgets/load-widget.ts` — loads a widget server-side (spec → MCP data →
+  pure runtime), deriving the widget `state`.
+- `app/page.tsx` — renders widgets through the runtime into the dashboard grid.
 
 ## Non-goals (v1)
 

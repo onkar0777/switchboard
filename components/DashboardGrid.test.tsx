@@ -41,4 +41,25 @@ describe("DashboardGrid", () => {
     const { container } = render(<DashboardGrid widgets={[okWidget]} />);
     expect(container.querySelector(".col-span-4")).toBeTruthy();
   });
+
+  it("routes a scoreboard widget to the ScoreboardTemplate via the registry", () => {
+    const scoreboard: GridWidget = {
+      id: "velocity",
+      title: "Weekly velocity",
+      size: "M",
+      template: "scoreboard",
+      output: {
+        verdict: "Velocity steady",
+        value: 42,
+        status: "good",
+        state: "ok",
+        rows: [],
+        slots: { headline: "Velocity steady", value: 42, deltaPct: 12 },
+      },
+    };
+    render(<DashboardGrid widgets={[scoreboard]} />);
+    expect(screen.getByText("42")).toBeTruthy();
+    expect(screen.getByText(/12%/)).toBeTruthy();
+    expect(screen.getByText(/▲/)).toBeTruthy(); // delta arrow is unique to ScoreboardTemplate
+  });
 });

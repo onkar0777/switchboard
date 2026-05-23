@@ -3,6 +3,12 @@ import { z } from "zod";
 const McpQuerySchema = z.object({
   tool: z.string(),
   args: z.record(z.unknown()),
+  // Optional rename map applied to each returned row: canonicalField -> source
+  // path (dotted, e.g. "base.repo.full_name"). Normalizes a server's native
+  // result shape (e.g. GitHub's minimal PR) into the canonical row fields the
+  // verdict pipeline and deeplink expect. Omit when the server already returns
+  // canonical rows (the mock/parity path).
+  map: z.record(z.string()).optional(),
 });
 
 // The verdict pipeline is validated structurally by the DSL parser (lib/widgets/dsl/parse.ts),
