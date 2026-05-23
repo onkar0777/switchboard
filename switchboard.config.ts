@@ -4,8 +4,8 @@ const config: SwitchboardConfig = {
   goals: [
     {
       kind: "github_prs_merged",
-      label: "Ship 5 PRs this week",
-      target: 5,
+      label: "Ship 3 PRs this week",
+      target: 3,
       unit: "PR",
       repos: ["onkarsingh/switchboard"],
       author: "onkarsingh",

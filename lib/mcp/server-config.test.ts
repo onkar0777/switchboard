@@ -57,4 +57,42 @@ describe("loadServerConfig", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("interpolates ${ENV} references in header values from the environment", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "sb-mcp-"));
+    process.env.SB_TEST_PAT = "ghp_secret_token";
+    try {
+      await writeFile(
+        path.join(dir, "github.json"),
+        JSON.stringify({
+          name: "github",
+          transport: { type: "http", url: "https://api.githubcopilot.com/mcp/", headers: { Authorization: "Bearer ${SB_TEST_PAT}" } },
+        }),
+      );
+      const cfg = await loadServerConfig("github", dir);
+      if (cfg.transport.type === "http") {
+        expect(cfg.transport.headers?.Authorization).toBe("Bearer ghp_secret_token");
+      }
+    } finally {
+      delete process.env.SB_TEST_PAT;
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("throws McpUnavailableError when a referenced ${ENV} variable is unset", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "sb-mcp-"));
+    delete process.env.SB_MISSING_PAT;
+    try {
+      await writeFile(
+        path.join(dir, "github.json"),
+        JSON.stringify({
+          name: "github",
+          transport: { type: "http", url: "https://api.githubcopilot.com/mcp/", headers: { Authorization: "Bearer ${SB_MISSING_PAT}" } },
+        }),
+      );
+      await expect(loadServerConfig("github", dir)).rejects.toBeInstanceOf(McpUnavailableError);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

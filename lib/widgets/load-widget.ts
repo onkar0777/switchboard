@@ -8,6 +8,7 @@ import { describeMcpError } from "@/lib/mcp/errors";
 import type { McpRunner } from "@/lib/mcp/client-manager";
 import type { GridWidget } from "@/components/DashboardGrid";
 import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
+import founderLiveSpecJson from "@/widgets/founder-pr-verdict.live.spec.json";
 
 function allEmpty(queries: Record<string, unknown>): boolean {
   const vals = Object.values(queries);
@@ -53,4 +54,11 @@ export async function loadWidget(
 
 export async function loadFounderWidget(now: Date = new Date()): Promise<GridWidget> {
   return loadWidget(WidgetSpecSchema.parse(founderSpecJson), now);
+}
+
+// Live variant: the founder widget wired to the real GitHub MCP server's
+// `search_pull_requests` tool (see widgets/founder-pr-verdict.live.spec.json).
+// The page uses this; the mock parity oracle (loadFounderWidget) is unchanged.
+export async function loadFounderWidgetLive(now: Date = new Date()): Promise<GridWidget> {
+  return loadWidget(WidgetSpecSchema.parse(founderLiveSpecJson), now);
 }

@@ -35,6 +35,26 @@ function normalizeRows(v: unknown): Array<Record<string, unknown>> | null {
   return null;
 }
 
+function getPath(obj: unknown, path: string): unknown {
+  return path.split(".").reduce<unknown>((acc, key) => {
+    if (acc != null && typeof acc === "object") return (acc as Record<string, unknown>)[key];
+    return undefined;
+  }, obj);
+}
+
+// Renames each row's fields per a query's `map` (canonicalField -> dotted source
+// path), producing canonical rows the verdict pipeline + deeplink expect.
+function applyFieldMap(
+  rows: Array<Record<string, unknown>>,
+  map: Record<string, string>,
+): Array<Record<string, unknown>> {
+  return rows.map((row) => {
+    const out: Record<string, unknown> = {};
+    for (const [canonical, srcPath] of Object.entries(map)) out[canonical] = getPath(row, srcPath);
+    return out;
+  });
+}
+
 function resolveArgs(args: Record<string, unknown>, ctx: DslContext): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(args)) {
@@ -76,7 +96,9 @@ export async function buildMcpData(
 
     const queries: Record<string, unknown> = {};
     names.forEach((name, i) => {
-      queries[name] = parseToolResult(results[i]);
+      const rows = parseToolResult(results[i]);
+      const map = spec.mcp.queries[name].map;
+      queries[name] = map ? applyFieldMap(rows, map) : rows;
     });
     return { queries };
   } catch (err) {

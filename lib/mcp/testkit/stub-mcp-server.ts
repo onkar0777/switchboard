@@ -110,3 +110,35 @@ export function registerGithubStub(rows: GithubStubRows = {}): (server: McpServe
     );
   };
 }
+
+// Registers the real GitHub MCP `search_pull_requests` tool. The founder LIVE
+// spec issues two calls against this one tool, distinguished by the search
+// qualifier in `query` (`is:merged` vs `is:open`). Rows are returned in GitHub's
+// search envelope `{ items: [...] }`, the shape parseToolResult's `items`
+// normalizer reads. Canned rows are GitHub-shaped (number/html_url/merged_at/
+// created_at/updated_at/base.repo.full_name) so the per-query field map is
+// exercised end-to-end over a real transport.
+export function registerGithubSearchStub(rows: GithubStubRows = {}): (server: McpServer) => void {
+  const merged = rows.merged ?? [];
+  const open = rows.open ?? [];
+  return (server) => {
+    server.registerTool(
+      "search_pull_requests",
+      {
+        inputSchema: {
+          query: z.string(),
+          owner: z.string().optional(),
+          repo: z.string().optional(),
+          sort: z.string().optional(),
+          order: z.string().optional(),
+          perPage: z.number().optional(),
+          page: z.number().optional(),
+        },
+      },
+      async ({ query }) => {
+        const items = /is:open/.test(query) ? open : merged;
+        return { content: [{ type: "text" as const, text: JSON.stringify({ items }) }] };
+      },
+    );
+  };
+}

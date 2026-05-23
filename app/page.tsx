@@ -1,5 +1,5 @@
 import { DashboardGrid } from "@/components/DashboardGrid";
-import { loadFounderWidget } from "@/lib/widgets/load-widget";
+import { loadFounderWidgetLive } from "@/lib/widgets/load-widget";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ function formatFetchedAt(d: Date): string {
 
 export default async function Page() {
   const fetchedAt = new Date();
-  const widget = await loadFounderWidget(frozenNow());
+  const widget = await loadFounderWidgetLive(frozenNow());
 
   return (
     <main className="mx-auto max-w-[1280px] space-y-10 p-4 md:p-8">

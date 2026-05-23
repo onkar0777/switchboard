@@ -2,6 +2,9 @@
   "name": "github",
   "transport": {
     "type": "http",
-    "url": "https://example.invalid/github-mcp"
+    "url": "https://api.githubcopilot.com/mcp/",
+    "headers": {
+      "Authorization": "Bearer ${GITHUB_PAT}"
+    }
   }
 }
