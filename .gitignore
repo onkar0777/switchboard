@@ -14,3 +14,6 @@ docs/superpowers/plans/
 # Personal config override (loader prefers this when present)
 switchboard.config.local.ts
 .gstack/
+
+# Authoring runtime state (durable jobs + build staging)
+.switchboard/
