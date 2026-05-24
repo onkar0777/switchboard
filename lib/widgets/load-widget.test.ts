@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { WidgetSpecSchema } from "./spec";
+import founderSpecJson from "@/widgets/founder-pr-verdict/spec.json";
 
 describe("loadFounderWidget", () => {
   beforeEach(() => {
@@ -33,5 +35,26 @@ describe("loadFounderWidget", () => {
     expect(widget.errorMessage).toContain("boom");
     vi.doUnmock("./mcp-data");
     vi.resetModules();
+  });
+});
+
+describe("loadWidget failure-state mapping", () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("maps McpUnauthorizedError to state=unauthorized", async () => {
+    delete process.env.SWITCHBOARD_FORCE_MOCK;
+    vi.resetModules();
+    const { loadWidget } = await import("./load-widget");
+    const { McpUnauthorizedError } = await import("@/lib/mcp/errors");
+    const spec = WidgetSpecSchema.parse(founderSpecJson);
+    const runner = {
+      listToolNames: async () => ["list_merged_prs", "list_open_prs"],
+      callTool: async () => { throw new McpUnauthorizedError("github"); },
+      close: async () => {},
+    };
+    const widget = await loadWidget(spec, new Date("2026-05-20T12:00:00.000Z"), { runner });
+    expect(widget.output.state).toBe("unauthorized");
   });
 });

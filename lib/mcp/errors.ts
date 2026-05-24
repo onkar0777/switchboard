@@ -28,11 +28,19 @@ export class McpBudgetError extends Error {
   }
 }
 
+export class McpUnauthorizedError extends Error {
+  constructor(public readonly server: string) {
+    super(`MCP server "${server}" rejected the request as unauthorized`);
+    this.name = "McpUnauthorizedError";
+  }
+}
+
 // Maps any error thrown by the MCP data path to a calm, user-facing message.
 export function describeMcpError(err: unknown, server: string): string {
   if (err instanceof McpDriftError) return err.message;
   if (err instanceof McpTimeoutError) return `The ${server} MCP server timed out. Retry.`;
   if (err instanceof McpBudgetError) return `The ${server} MCP server was too slow. Retry.`;
   if (err instanceof McpUnavailableError) return `Can't reach the ${server} MCP server.`;
+  if (err instanceof McpUnauthorizedError) return `Switchboard isn't authorized for the ${server} MCP server.`;
   return err instanceof Error ? `Couldn't compute: ${err.message}` : "Couldn't compute.";
 }
