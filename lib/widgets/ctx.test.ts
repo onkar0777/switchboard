@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildContext } from "./ctx";
 import { buildFixtureData } from "./fixture-data";
 import { WidgetSpecSchema } from "./spec";
-import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
+import founderSpecJson from "@/widgets/founder-pr-verdict/spec.json";
 
 const NOW = new Date("2026-05-06T12:00:00.000Z");
 

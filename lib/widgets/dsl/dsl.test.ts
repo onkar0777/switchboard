@@ -301,4 +301,18 @@ describe("evaluate — format mini-language", () => {
       "Base.",
     );
   });
+
+  it("format op yields empty string when current is null (first on empty set)", () => {
+    // DSL contract: a format op whose current value is null (produced by first on
+    // an empty result set) must emit "" rather than a partial/garbage string.
+    const setup = [{ op: "select", from: "queries.items" }, { op: "first" }];
+    expect(fmt("Item {id} — {title}", setup, { items: [] })).toBe("");
+  });
+
+  it("format op interpolates normally when current is non-null (first on non-empty set)", () => {
+    // Companion positive-case: same pipeline over a non-empty set must still
+    // produce the fully-interpolated string, confirming the guard only fires on null.
+    const setup = [{ op: "select", from: "queries.items" }, { op: "first" }];
+    expect(fmt("Item {id} — {title}", setup, { items: [{ id: "42", title: "Hello" }] })).toBe("Item 42 — Hello");
+  });
 });

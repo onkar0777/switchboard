@@ -4,10 +4,10 @@ import { buildContext } from "./ctx";
 import { buildMcpData } from "./mcp-data";
 import { execute, validateDeeplinkFields, type WidgetState } from "./runtime";
 import { validateSlots, type TemplateName } from "./template-slots";
-import { describeMcpError } from "@/lib/mcp/errors";
+import { describeMcpError, McpUnauthorizedError } from "@/lib/mcp/errors";
 import type { McpRunner } from "@/lib/mcp/client-manager";
 import type { GridWidget } from "@/components/DashboardGrid";
-import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
+import founderSpecJson from "@/widgets/founder-pr-verdict/spec.json";
 import founderLiveSpecJson from "@/widgets/founder-pr-verdict.live.spec.json";
 
 function allEmpty(queries: Record<string, unknown>): boolean {
@@ -43,12 +43,13 @@ export async function loadWidget(
     const state: WidgetState = spec.render.template === "list" && allEmpty(data.queries) ? "empty" : "ok";
     return { id: spec.id, title: spec.title, size: spec.size, template: spec.render.template, output: { ...output, state } };
   } catch (err) {
+    const state: WidgetState = err instanceof McpUnauthorizedError ? "unauthorized" : "error";
     return {
       id: spec.id,
       title: spec.title,
       size: spec.size,
       template: spec.render.template,
-      output: { verdict: "", value: null, status: "neutral", state: "error", rows: [], slots: {} },
+      output: { verdict: "", value: null, status: "neutral", state, rows: [], slots: {} },
       errorMessage: describeMcpError(err, spec.mcp.server),
     };
   }

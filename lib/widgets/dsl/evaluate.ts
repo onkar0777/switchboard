@@ -214,7 +214,10 @@ function runOp(
       return out;
     }
     case "format": {
-      const out = renderTemplate(op.template, current, bag, ctx);
+      // When the current pipeline value is null (e.g. `first` on an empty set),
+      // the format has no row to interpolate from — produce "" so that downstream
+      // `cond` guards correctly test for an absent value.
+      const out = current === null ? "" : renderTemplate(op.template, current, bag, ctx);
       const key = op.as ?? "verdict";
       bag[key] = out;
       return out;
