@@ -29,7 +29,8 @@ describe("JobStore", () => {
     const read = await reopened.get(job.id);
     expect(read?.state).toBe("building");
     expect(read?.sessionId).toBe("sess-1");
-    expect(read?.updatedAt >= job.updatedAt).toBe(true);
+    expect(read).toBeDefined();
+    expect(read!.updatedAt >= job.updatedAt).toBe(true);
   });
 
   it("findActive returns the single non-terminal, non-queued job", async () => {
