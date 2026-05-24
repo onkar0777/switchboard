@@ -123,4 +123,42 @@ describe("JobRunner (fake agent)", () => {
     expect(sa).not.toBe("failed");
     expect(sb).not.toBe("failed");
   });
+
+  it("AC4 (resume): a fresh runner resumes a building job from its session_id", async () => {
+    const jobsDir = join(dir, "jobs");
+    const store = new JobStore(jobsDir);
+    // Simulate a build interrupted mid-flight: persisted as building with a session.
+    const job = await store.create("track");
+    await store.save({ ...job, state: "building", sessionId: "sess-X" });
+
+    const resumed: string[] = [];
+    const agent = {
+      run: async (input: { resume?: string }, events: { onMarker: (m: { kind: "done"; widgetName: string }) => void }) => {
+        if (input.resume) resumed.push(input.resume);
+        events.onMarker({ kind: "done", widgetName: "track-widget" });
+        return { endedTurn: true };
+      },
+    };
+    const runner = new JobRunner({ store, agent: agent as never, root: dir, land: async () => {} });
+    await runner.resumeInterrupted();
+    // The runner re-drove the building turn with resume = the stored session id.
+    await waitFor(() => resumed.includes("sess-X"));   // <-- waitFor, not a bare expect (avoids the race)
+    expect(resumed).toContain("sess-X");
+  });
+
+  it("AC8: an agent error fails the job with a legible reason and writes no package", async () => {
+    const store = new JobStore(join(dir, "jobs"));
+    const agent = new FakeAgentRunner({ scripts: [
+      [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]w[[/summary]]" }],
+      [{ type: "error", message: "MCP server unreachable" }],
+    ]});
+    const land = vi.fn(async () => {});
+    const runner = new JobRunner({ store, agent, root: dir, land });
+    const job = await runner.enqueue("track");
+    await waitFor(async () => (await store.get(job.id))?.state === "summary");
+    await runner.proceed(job.id);
+    await waitFor(async () => (await store.get(job.id))?.state === "failed");
+    expect((await store.get(job.id))!.failureReason).toMatch(/unreachable|without a \[\[done/i);
+    expect(land).not.toHaveBeenCalled();
+  });
 });

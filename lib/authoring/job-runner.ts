@@ -176,9 +176,29 @@ export class JobRunner {
     });
   }
 
+  // On boot, re-attach to a build that was interrupted mid-flight: resume the
+  // SDK session by id and run it to completion. If it has no session id to
+  // resume, fail it legibly rather than hang.
+  async resumeInterrupted(): Promise<void> {
+    const active = await this.deps.store.findActive();
+    if (!active) return void this.pump();
+    if (active.state === "building" && active.sessionId) {
+      this.running = true;
+      void (async () => {
+        await this.runTurn(active.id, "Resume the interrupted build.", active.sessionId);
+        await this.finishBuild(active.id);
+      })().catch((e) => this.failSafe(active.id, (e as Error).message)).finally(() => {
+        this.running = false;
+        void this.pump();
+      });
+    } else if (active.state === "building") {
+      await this.failSafe(active.id, "session could not be resumed after restart");
+    }
+  }
+
   // One query() turn. Wires agent events → state machine + the question bridge.
   private async runTurn(jobId: string, prompt: string, resume: string | undefined): Promise<void> {
-    await this.deps.agent.run(
+    const result = await this.deps.agent.run(
       { prompt, cwd: this.deps.root, resume },
       {
         onSession: (id) => void this.saveSession(jobId, id),
@@ -190,6 +210,7 @@ export class JobRunner {
         },
       },
     );
+    if (result.error) await this.failSafe(jobId, result.error);
   }
 
   private async saveSession(jobId: string, sessionId: string): Promise<void> {

@@ -4,7 +4,7 @@
 // observable state, the emitted package, dashboard.layout.json, the SSE/question
 // bridge. All driven by the FakeAgentRunner — no network, no real agent.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JobStore } from "./job-store";
@@ -112,7 +112,42 @@ describe("AC3 — proceed → dock, grid clean", () => {
 });
 
 describe("AC4 — durable, serial", () => {
-  it.skip("a running build resumes from session_id after restart; a second submission sits in queued", () => {});
+  it("a running build resumes from session_id after restart; a second submission sits in queued", async () => {
+    const store = new JobStore(join(dir, "jobs"));
+    // Simulate a build interrupted mid-flight: persisted as building with a session.
+    const job = await store.create("track");
+    await store.save({ ...job, state: "building", sessionId: "sess-X" });
+
+    const resumed: string[] = [];
+    const agent = {
+      run: async (input: { resume?: string }, events: { onMarker: (m: { kind: "done"; widgetName: string }) => void }) => {
+        if (input.resume) resumed.push(input.resume);
+        events.onMarker({ kind: "done", widgetName: "track-widget" });
+        return { endedTurn: true };
+      },
+    };
+    const runner = new JobRunner({ store, agent: agent as never, root: dir, land: vi.fn(async () => {}) });
+    // A fresh runner re-attaches to the interrupted build and resumes its session.
+    await runner.resumeInterrupted();
+    await waitFor(() => resumed.includes("sess-X"));
+    expect(resumed).toContain("sess-X");
+    await waitFor(async () => (await store.get(job.id))?.state === "done");
+  });
+
+  it("a second submission sits in queued while one is active", async () => {
+    const store = new JobStore(join(dir, "jobs"));
+    // A turn-script that parks the first job in clarifying with an unanswered
+    // question, so it stays the active build and never advances.
+    const agent = new FakeAgentRunner({ scripts: [[
+      { type: "session", id: "s1" },
+      { type: "question", toolUseId: "t1", questions: [{ question: "Which repo?", header: "Repo", options: [{ label: "sb", description: "" }], multiSelect: false }] },
+    ]] });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn() });
+    const first = await runner.enqueue("a");
+    await waitFor(async () => (await store.get(first.id))?.state === "clarifying");
+    const second = await runner.enqueue("b");
+    expect((await store.get(second.id))!.state).toBe("queued");
+  });
 });
 
 describe("AC5 — mid-build question bubble-up", () => {
@@ -140,7 +175,28 @@ describe("AC7 — emitted package is valid by construction", () => {
   it.skip("structure + golden + transport-smoke pass over the emitted package", () => {});
 });
 describe("AC8 — failure is legible", () => {
-  it.skip("non-convergence/unreachable MCP → failed with reason, no partial package, Refine/Discard offered", () => {});
+  it("non-convergence/unreachable MCP → failed with reason, no partial package, Refine/Discard offered", async () => {
+    const store = new JobStore(join(dir, "jobs"));
+    const agent = new FakeAgentRunner({ scripts: [
+      [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]w[[/summary]]" }],
+      [{ type: "error", message: "MCP server unreachable" }],
+    ]});
+    const land = vi.fn(async () => {});
+    const runner = new JobRunner({ store, agent, root: dir, land });
+    const job = await runner.enqueue("track");
+    await waitFor(async () => (await store.get(job.id))?.state === "summary");
+    await runner.proceed(job.id);
+    await waitFor(async () => (await store.get(job.id))?.state === "failed");
+
+    const failed = (await store.get(job.id))!;
+    expect(failed.state).toBe("failed");
+    // A legible, non-empty reason (the agent error or the no-[[done]] non-convergence).
+    expect(failed.failureReason).toBeTruthy();
+    expect(failed.failureReason).toMatch(/unreachable|without a \[\[done/i);
+    // No package landed, and no widgets/<name> dir was written under the temp root.
+    expect(land).not.toHaveBeenCalled();
+    expect(existsSync(join(dir, "widgets"))).toBe(false);
+  });
 });
 describe("AC9 — no credential plumbing", () => {
   it.skip("a build authenticates by inheriting the local login — no cc-creds reader or hand-built Anthropic client", () => {});
