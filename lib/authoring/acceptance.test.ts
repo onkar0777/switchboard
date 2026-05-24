@@ -198,7 +198,17 @@ describe("AC6 — success landing", () => {
       writeFileSync(join(stageDir, "golden", "cases.json"), readFileSync(join(founder, "golden", "cases.json"), "utf8"));
 
       await runner.proceed(job.id);
-      await waitFor(async () => (await store.get(job.id))?.state === "done");
+      // Wait for the LANDING side-effect itself, not just state==="done": the
+      // [[done]] marker flips state to "done" during the turn, but finishBuild's
+      // landPackage runs after the turn resolves. Polling the filesystem (rather
+      // than the state) closes that race under parallel test load.
+      await waitFor(
+        () =>
+          existsSync(join(root, "widgets", "test-widget", "spec.json")) &&
+          existsSync(join(root, "dashboard.layout.json")),
+        5000,
+      );
+      expect((await store.get(job.id))?.state).toBe("done");
 
       // The real landPackage published the staged package under widgets/<id>.
       expect(existsSync(join(root, "widgets", "test-widget", "spec.json"))).toBe(true);
