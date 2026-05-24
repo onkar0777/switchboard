@@ -4,7 +4,7 @@ import { buildContext } from "./ctx";
 import { WidgetSpecSchema } from "./spec";
 import { McpBudgetError, McpDriftError } from "@/lib/mcp/errors";
 import type { McpRunner } from "@/lib/mcp/client-manager";
-import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
+import founderSpecJson from "@/widgets/founder-pr-verdict/spec.json";
 
 const NOW = new Date("2026-05-06T12:00:00.000Z");
 

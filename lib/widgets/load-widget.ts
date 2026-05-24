@@ -7,7 +7,7 @@ import { validateSlots, type TemplateName } from "./template-slots";
 import { describeMcpError } from "@/lib/mcp/errors";
 import type { McpRunner } from "@/lib/mcp/client-manager";
 import type { GridWidget } from "@/components/DashboardGrid";
-import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
+import founderSpecJson from "@/widgets/founder-pr-verdict/spec.json";
 import founderLiveSpecJson from "@/widgets/founder-pr-verdict.live.spec.json";
 
 function allEmpty(queries: Record<string, unknown>): boolean {

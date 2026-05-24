@@ -8,7 +8,7 @@ import { WidgetSpecSchema } from "@/lib/widgets/spec";
 import { loadWidget } from "@/lib/widgets/load-widget";
 import { describeMcpError } from "@/lib/mcp/errors";
 import type { ServerConfig } from "@/lib/mcp/server-config";
-import founderSpecJson from "@/widgets/founder-pr-verdict.spec.json";
+import founderSpecJson from "@/widgets/founder-pr-verdict/spec.json";
 
 const NOW = new Date("2026-05-20T12:00:00.000Z");
 const spec = WidgetSpecSchema.parse(founderSpecJson);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { WidgetSpecSchema } from "./spec";
 import { parsePipeline } from "./dsl";
-import spec from "@/widgets/founder-pr-verdict.spec.json";
+import spec from "@/widgets/founder-pr-verdict/spec.json";
 
 describe("founder-pr-verdict.spec.json", () => {
   it("validates against WidgetSpecSchema", () => {
