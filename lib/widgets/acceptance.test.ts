@@ -12,6 +12,9 @@ import { givenToPipelineInput } from "./given-loader";
 import { parsePipeline } from "./dsl";
 import { buildContext } from "./ctx";
 import { execute } from "./runtime";
+import { loadWidget } from "./load-widget";
+import { startStubMcpServer, registerGithubStub } from "@/lib/mcp/testkit/stub-mcp-server";
+import { openRunner } from "@/lib/mcp/client-manager";
 
 const NOW = new Date("2026-05-20T12:00:00.000Z");
 function exec(name: string, caseName: string) {
@@ -45,7 +48,22 @@ describe("AC3 — empty state", () => {
   });
 });
 describe("AC4 — transport smoke per widget", () => {
-  it.skip("happy given replayed over real stub-MCP yields state=ok and the verdict literal", () => {});
+  it("founder happy given over real stub-MCP yields state=ok + 'Shipped: 5/5'", async () => {
+    const pkg = discoverWidgetPackages().find((p) => p.name === "founder-pr-verdict")!;
+    const cs = CasesSchema.parse(JSON.parse(readFileSync(join(pkg.dir, "golden", "cases.json"), "utf8")));
+    const happy = cs.cases.find((c) => c.name === "happy")!;
+    if (!("given" in happy)) throw new Error("happy data case required");
+    const stub = await startStubMcpServer(registerGithubStub({ merged: happy.given.merged, open: happy.given.open ?? [] }));
+    const runner = await openRunner(stub.config);
+    try {
+      const widget = await loadWidget(pkg.spec, new Date("2026-05-20T12:00:00.000Z"), { runner });
+      expect(widget.output.state).toBe("ok");
+      expect(widget.output.verdict).toBe("Shipped: 5/5 PRs this week.");
+    } finally {
+      await runner.close();
+      await stub.close();
+    }
+  });
 });
 describe("AC5 — no v1 oracle", () => {
   it("computeVerdict and the parity tests no longer exist", () => {
