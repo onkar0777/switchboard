@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { discoverWidgetPackages } from "./registry";
+import { discoverWidgetPackages, KNOWN_WIDGET_MIN } from "./registry";
 import { CasesSchema } from "./cases";
 import { givenToPipelineInput } from "./given-loader";
 import { parsePipeline } from "./dsl";
@@ -23,7 +23,11 @@ function exec(name: string, caseName: string) {
 }
 
 describe("AC1 — structure suite over any registered widget", () => {
-  it.skip("validates schema/pipeline/slots/state-machine/deeplink/DESIGN-color and trips a min-count guard", () => {});
+  it("discovers at least the known minimum and the founder package validates", () => {
+    const pkgs = discoverWidgetPackages();
+    expect(pkgs.length).toBeGreaterThanOrEqual(KNOWN_WIDGET_MIN);
+    expect(pkgs.some((p) => p.name === "founder-pr-verdict")).toBe(true);
+  });
 });
 describe("AC2 — golden semantics from given → then", () => {
   it("matches the founder happy verdict literal + status", () => {
