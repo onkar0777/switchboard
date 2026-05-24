@@ -4,12 +4,13 @@
 // observable state, the emitted package, dashboard.layout.json, the SSE/question
 // bridge. All driven by the FakeAgentRunner — no network, no real agent.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JobStore } from "./job-store";
 import { FakeAgentRunner } from "./fake-agent-runner";
 import { JobRunner } from "./job-runner";
+import { landPackage } from "./landing";
 import type { JobState } from "./job-types";
 
 let dir: string;
@@ -169,7 +170,46 @@ describe("AC5 — mid-build question bubble-up", () => {
 });
 
 describe("AC6 — success landing", () => {
-  it.skip("package exists, id appended to dashboard.layout.json atomically, dock row clears, widget renders", () => {});
+  // The "dock row clears" / "widget renders" facets are UI (Task 16 + the
+  // design/QA gauntlet). At this backend layer we assert the LANDING facet
+  // end-to-end through the real runner + the REAL landPackage: a successful
+  // build that reaches [[done:<id>]] lands the staged package, so the package
+  // files exist under widgets/<id> and the layout contains the id.
+  it("a successful build lands the staged package and appends the id to dashboard.layout.json", async () => {
+    const root = mkdtempSync(join(tmpdir(), "sb-ac6-"));
+    try {
+      const store = new JobStore(join(root, ".switchboard", "jobs"));
+      const agent = new FakeAgentRunner({ scripts: [
+        [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]a widget[[/summary]]" }],
+        [{ type: "marker", text: "[[done:test-widget]]" }],
+      ]});
+      const runner = new JobRunner({ store, agent, root, land: landPackage });
+      const job = await runner.enqueue("track PRs");
+      await waitFor(async () => (await store.get(job.id))?.state === "summary");
+
+      // Pre-stage the package BEFORE proceeding: finishBuild's real landPackage
+      // copies .switchboard/staging/<jobId> → widgets/<widgetName>, so those
+      // staged files must exist before the [[done]] marker fires. The build turn
+      // only starts on proceed(), so staging now is deterministic.
+      const stageDir = join(root, ".switchboard", "staging", job.id);
+      mkdirSync(join(stageDir, "golden"), { recursive: true });
+      const founder = join(process.cwd(), "widgets", "founder-pr-verdict");
+      writeFileSync(join(stageDir, "spec.json"), readFileSync(join(founder, "spec.json"), "utf8"));
+      writeFileSync(join(stageDir, "golden", "cases.json"), readFileSync(join(founder, "golden", "cases.json"), "utf8"));
+
+      await runner.proceed(job.id);
+      await waitFor(async () => (await store.get(job.id))?.state === "done");
+
+      // The real landPackage published the staged package under widgets/<id>.
+      expect(existsSync(join(root, "widgets", "test-widget", "spec.json"))).toBe(true);
+      expect(existsSync(join(root, "widgets", "test-widget", "golden", "cases.json"))).toBe(true);
+      // …and appended the id to the dashboard layout.
+      const layout = JSON.parse(readFileSync(join(root, "dashboard.layout.json"), "utf8"));
+      expect(layout.widgets).toContain("test-widget");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 describe("AC7 — emitted package is valid by construction", () => {
   it("a package in the locked shape passes schema + golden + dry-run", async () => {
