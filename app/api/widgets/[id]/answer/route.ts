@@ -8,18 +8,49 @@ export const dynamic = "force-dynamic";
 //   { kind: "proceed" }
 //   { kind: "feedback", text: string }
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const body = (await req.json()) as
-    | { kind: "answer"; answers: Record<string, string | string[]> }
-    | { kind: "proceed" }
-    | { kind: "feedback"; text: string };
-  const runner = getRunner();
+  let body: { kind: string; answers?: unknown; text?: unknown };
   try {
-    if (body.kind === "answer") await runner.answer(params.id, body.answers);
-    else if (body.kind === "proceed") await runner.proceed(params.id);
-    else if (body.kind === "feedback") await runner.feedback(params.id, body.text);
-    else return NextResponse.json({ error: "unknown kind" }, { status: 400 });
-  } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 409 });
+    body = (await req.json()) as { kind: string; answers?: unknown; text?: unknown };
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
   }
+
+  const runner = getRunner();
+
+  switch (body.kind) {
+    case "answer": {
+      if (!body.answers || typeof body.answers !== "object") {
+        return NextResponse.json({ error: "answers must be a non-null object" }, { status: 400 });
+      }
+      try {
+        await runner.answer(params.id, body.answers as Record<string, string | string[]>);
+      } catch (e) {
+        return NextResponse.json({ error: (e as Error).message }, { status: 409 });
+      }
+      break;
+    }
+    case "proceed": {
+      try {
+        await runner.proceed(params.id);
+      } catch (e) {
+        return NextResponse.json({ error: (e as Error).message }, { status: 409 });
+      }
+      break;
+    }
+    case "feedback": {
+      if (typeof body.text !== "string" || !body.text.trim()) {
+        return NextResponse.json({ error: "text must be a non-empty string" }, { status: 400 });
+      }
+      try {
+        await runner.feedback(params.id, body.text);
+      } catch (e) {
+        return NextResponse.json({ error: (e as Error).message }, { status: 409 });
+      }
+      break;
+    }
+    default:
+      return NextResponse.json({ error: "unknown kind" }, { status: 400 });
+  }
+
   return NextResponse.json({ ok: true });
 }

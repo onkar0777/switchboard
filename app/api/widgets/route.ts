@@ -6,7 +6,13 @@ import { join } from "node:path";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const { intent } = (await req.json()) as { intent?: string };
+  let parsed: { intent?: string };
+  try {
+    parsed = (await req.json()) as { intent?: string };
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  const { intent } = parsed;
   if (!intent || !intent.trim()) return NextResponse.json({ error: "intent required" }, { status: 400 });
   const job = await getRunner().enqueue(intent.trim());
   return NextResponse.json({ job });
