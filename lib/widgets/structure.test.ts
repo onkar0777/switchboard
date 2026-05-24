@@ -1,8 +1,8 @@
 // @vitest-environment node
 // Layer 1 — structural conformance, generic over every discovered package.
-// Zero per-widget code: schema, pipeline parse, slot contract, state machine,
-// deeplink shape, the DESIGN.md color rule, the required-case-set, and the
-// anti empty-glob min-count guard.
+// Zero per-widget code: schema, pipeline parse, slot contract, deeplink shape,
+// the DESIGN.md color rule, the required-case-set, and the anti empty-glob
+// min-count guard. (State transitions are driven in golden.test.ts, not here.)
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";

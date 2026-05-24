@@ -85,10 +85,12 @@ If any open PR has gone untouched for >24h, a Drag suffix appears
 
 ## Architecture
 
-- `lib/verdicts/engine.ts` — pure functions (`statusFor`, `headlineFor`,
-  `pickMondayMove`, `bucketMomentum`, `computeVerdict`).
-- `lib/mcp/adapter.ts` — `MCPAdapter` interface. `MockAdapter` backs the parity
-  oracle and the `SWITCHBOARD_FORCE_MOCK=1` data path. Live data flows through a
+- `lib/widgets/dsl/` + `lib/widgets/runtime.ts` — the verdict pipeline DSL
+  (declared per widget in `spec.json`) and the pure runtime that evaluates it
+  into a verdict/status/slots output. Shared helpers: `lib/widgets/week.ts`
+  (week boundaries), `lib/format.ts` (`pluralize`).
+- `lib/mcp/adapter.ts` — `MCPAdapter` interface. `MockAdapter` backs the
+  `SWITCHBOARD_FORCE_MOCK=1` data path. Live data flows through a
   real MCP server: `lib/mcp/client-manager.ts` (transport, timeout, retry,
   concurrency cap) feeding `lib/widgets/mcp-data.ts`, configured per
   `mcp/<server>.json`.
