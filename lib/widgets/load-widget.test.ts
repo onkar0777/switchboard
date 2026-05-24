@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WidgetSpecSchema } from "./spec";
 import founderSpecJson from "@/widgets/founder-pr-verdict/spec.json";
 
 describe("loadFounderWidget", () => {
@@ -48,6 +47,7 @@ describe("loadWidget failure-state mapping", () => {
     vi.resetModules();
     const { loadWidget } = await import("./load-widget");
     const { McpUnauthorizedError } = await import("@/lib/mcp/errors");
+    const { WidgetSpecSchema } = await import("./spec");
     const spec = WidgetSpecSchema.parse(founderSpecJson);
     const runner = {
       listToolNames: async () => ["list_merged_prs", "list_open_prs"],

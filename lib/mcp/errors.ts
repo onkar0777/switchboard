@@ -41,6 +41,6 @@ export function describeMcpError(err: unknown, server: string): string {
   if (err instanceof McpTimeoutError) return `The ${server} MCP server timed out. Retry.`;
   if (err instanceof McpBudgetError) return `The ${server} MCP server was too slow. Retry.`;
   if (err instanceof McpUnavailableError) return `Can't reach the ${server} MCP server.`;
-  if (err instanceof McpUnauthorizedError) return `Switchboard isn't authorized for the ${server} MCP server.`;
+  if (err instanceof McpUnauthorizedError) return `Switchboard isn't authorized for the ${err.server} MCP server.`;
   return err instanceof Error ? `Couldn't compute: ${err.message}` : "Couldn't compute.";
 }
