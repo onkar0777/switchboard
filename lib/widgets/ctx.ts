@@ -1,4 +1,4 @@
-import { mondayOfWeek, sundayEndOfWeek } from "@/lib/verdicts/engine";
+import { mondayOfWeek, sundayEndOfWeek } from "./week";
 import type { WidgetSpec } from "./spec";
 import type { DslContext } from "./dsl/evaluate";
 
