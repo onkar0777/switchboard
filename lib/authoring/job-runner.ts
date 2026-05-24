@@ -5,12 +5,16 @@ import type { Job, JobEvent } from "./job-types";
 import { transition } from "./state-machine";
 
 type LandFn = (input: { root: string; stageDir: string; widgetName: string }) => Promise<void>;
+// Structural type for the staged-package validator (mirrors validateStagedPackage
+// without importing it — keeps the runner decoupled from validate-package).
+type ValidateFn = (stageDir: string, now: Date) => Promise<{ ok: true } | { ok: false; reason: string }>;
 
 interface Deps {
   store: JobStore;
   agent: AgentRunner;
   root: string; // repo root
   land: LandFn;
+  validate: ValidateFn;
 }
 
 // Serial orchestrator. One active build at a time; the rest sit queued. Bridges
@@ -25,6 +29,12 @@ export class JobRunner {
   // (e.g. [[phase]] then [[done]] within one fire-and-forget turn) don't clobber
   // each other via stale reads. One promise chain per job id.
   private mutex = new Map<string, Promise<unknown>>();
+  // A [[done]] marker only RECORDS intent to land here; the actual `done`
+  // transition is deferred to finishBuild, AFTER validation succeeds. Keyed by
+  // job id → staged widget name. This keeps the job in `building` through the
+  // turn so failSafe can still fire if validation fails (the state machine
+  // guards `fail` from the terminal `done` state).
+  private pendingDone = new Map<string, string>();
 
   constructor(private readonly deps: Deps) {}
 
@@ -155,13 +165,32 @@ export class JobRunner {
 
   private async finishBuild(jobId: string): Promise<void> {
     // Drain any in-flight marker mutations from the just-completed turn before
-    // inspecting terminal state (markers are applied fire-and-forget).
-    const job = await this.withLock(jobId, () => this.deps.store.get(jobId));
+    // inspecting state (markers are applied fire-and-forget).
+    const job = await this.lockedGet(jobId);
     if (!job) return;
-    if (job.state === "done" && job.widgetName) {
-      // [[done]] already transitioned the job to done; land the staged package.
-      await this.deps.land({ root: this.deps.root, stageDir: this.stageDir(jobId), widgetName: job.widgetName });
-    } else if (job.state === "building") {
+    // If the turn already drove the job terminal (e.g. an agent error fired
+    // failSafe, or a [[failed]] marker), there's nothing left to do — and any
+    // stashed pendingDone is moot. Don't attempt a done after failed.
+    if (job.state !== "building") {
+      this.pendingDone.delete(jobId);
+      return;
+    }
+
+    const widgetName = this.pendingDone.get(jobId);
+    if (widgetName) {
+      this.pendingDone.delete(jobId);
+      // Validate the staged package BEFORE landing. "done" must mean
+      // "validated AND landed": a malformed package fails the job and lands
+      // nothing. validate + land run OUTSIDE the lock (slow); the job stays
+      // `building` so failSafe's `fail` transition is legal on failure.
+      const res = await this.deps.validate(this.stageDir(jobId), new Date());
+      if (!res.ok) {
+        await this.failSafe(jobId, res.reason);
+        return;
+      }
+      await this.deps.land({ root: this.deps.root, stageDir: this.stageDir(jobId), widgetName });
+      await this.apply(jobId, { kind: "done", widgetName }); // done = validated + landed
+    } else {
       // Turn ended with no [[done:<id>]] (and no [[failed]]) — non-convergence.
       await this.failSafe(jobId, "build ended without a [[done:<id>]] marker");
     }
@@ -223,8 +252,12 @@ export class JobRunner {
   private async onMarker(jobId: string, marker: Marker): Promise<void> {
     if (marker.kind === "summary") await this.apply(jobId, { kind: "summary", text: marker.text });
     else if (marker.kind === "phase") await this.apply(jobId, { kind: "phase", phase: marker.phase });
-    else if (marker.kind === "done") await this.apply(jobId, { kind: "done", widgetName: marker.widgetName });
-    else if (marker.kind === "failed") await this.failSafe(jobId, marker.reason);
+    else if (marker.kind === "done") {
+      // Defer the `done` transition: just record the intent to land. The job
+      // stays `building` until finishBuild validates the staged package, so a
+      // malformed package can still be failed (you can't `fail` from `done`).
+      this.pendingDone.set(jobId, marker.widgetName);
+    } else if (marker.kind === "failed") await this.failSafe(jobId, marker.reason);
   }
 
   private intakePrompt(jobId: string, intent: string): string {

@@ -3,6 +3,7 @@ import { JobStore } from "./job-store";
 import { JobRunner } from "./job-runner";
 import { ClaudeAgentRunner } from "./claude-agent-runner";
 import { landPackage } from "./landing";
+import { validateStagedPackage } from "./validate-package";
 import { join } from "node:path";
 
 declare global {
@@ -21,6 +22,7 @@ export function getRunner(): JobRunner {
       agent: new ClaudeAgentRunner(),
       root,
       land: landPackage,
+      validate: validateStagedPackage,
     });
     void runner.resumeInterrupted();
     globalThis.__sbRunner = runner;

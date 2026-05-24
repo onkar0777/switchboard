@@ -11,6 +11,7 @@ import { JobStore } from "./job-store";
 import { FakeAgentRunner } from "./fake-agent-runner";
 import { JobRunner } from "./job-runner";
 import { landPackage } from "./landing";
+import { validateStagedPackage } from "./validate-package";
 import type { JobState } from "./job-types";
 
 let dir: string;
@@ -45,7 +46,7 @@ describe("AC1 — intent → questions → summary", () => {
       { type: "question", toolUseId: "t1", questions: [{ question: "Which repo?", header: "Repo", options: [{ label: "sb", description: "" }], multiSelect: false }] },
       { type: "marker", text: "[[summary]]builds a PR widget[[/summary]]" },
     ]]});
-    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn() });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(), validate: async () => ({ ok: true }) });
     const job = await runner.enqueue("track my PRs");
 
     await waitFor(async () => (await store.get(job.id))?.state === "clarifying" && Boolean((await store.get(job.id))?.pendingQuestion));
@@ -66,7 +67,7 @@ describe("AC2 — feedback loop", () => {
       [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]tracks my PRs[[/summary]]" }],
       [{ type: "marker", text: "[[summary]]tracks my issues instead[[/summary]]" }],
     ]});
-    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn() });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(), validate: async () => ({ ok: true }) });
 
     // Observe every state the job ever takes; assert it stays within the union.
     const seen: JobState[] = [];
@@ -100,7 +101,7 @@ describe("AC3 — proceed → dock, grid clean", () => {
       [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]a widget[[/summary]]" }],
       [{ type: "marker", text: "[[phase:implementing]]" }, { type: "marker", text: "[[done:pr-widget]]" }],
     ]});
-    const runner = new JobRunner({ store, agent, root: dir, land });
+    const runner = new JobRunner({ store, agent, root: dir, land, validate: async () => ({ ok: true }) });
     const job = await runner.enqueue("track PRs");
     await waitFor(async () => (await store.get(job.id))?.state === "summary");
 
@@ -127,7 +128,7 @@ describe("AC4 — durable, serial", () => {
         return { endedTurn: true };
       },
     };
-    const runner = new JobRunner({ store, agent: agent as never, root: dir, land: vi.fn(async () => {}) });
+    const runner = new JobRunner({ store, agent: agent as never, root: dir, land: vi.fn(async () => {}), validate: async () => ({ ok: true }) });
     // A fresh runner re-attaches to the interrupted build and resumes its session.
     await runner.resumeInterrupted();
     await waitFor(() => resumed.includes("sess-X"));
@@ -143,7 +144,7 @@ describe("AC4 — durable, serial", () => {
       { type: "session", id: "s1" },
       { type: "question", toolUseId: "t1", questions: [{ question: "Which repo?", header: "Repo", options: [{ label: "sb", description: "" }], multiSelect: false }] },
     ]] });
-    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn() });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(), validate: async () => ({ ok: true }) });
     const first = await runner.enqueue("a");
     await waitFor(async () => (await store.get(first.id))?.state === "clarifying");
     const second = await runner.enqueue("b");
@@ -158,7 +159,7 @@ describe("AC5 — mid-build question bubble-up", () => {
       [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]w[[/summary]]" }],
       [{ type: "question", toolUseId: "t2", questions: [{ question: "Which field?", header: "Field", options: [{ label: "x", description: "" }], multiSelect: false }] }, { type: "marker", text: "[[done:w]]" }],
     ]});
-    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(async () => {}) });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(async () => {}), validate: async () => ({ ok: true }) });
     const job = await runner.enqueue("track");
     await waitFor(async () => (await store.get(job.id))?.state === "summary");
     await runner.proceed(job.id);
@@ -183,7 +184,7 @@ describe("AC6 — success landing", () => {
         [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]a widget[[/summary]]" }],
         [{ type: "marker", text: "[[done:test-widget]]" }],
       ]});
-      const runner = new JobRunner({ store, agent, root, land: landPackage });
+      const runner = new JobRunner({ store, agent, root, land: landPackage, validate: validateStagedPackage });
       const job = await runner.enqueue("track PRs");
       await waitFor(async () => (await store.get(job.id))?.state === "summary");
 
@@ -243,7 +244,7 @@ describe("AC8 — failure is legible", () => {
       [{ type: "error", message: "MCP server unreachable" }],
     ]});
     const land = vi.fn(async () => {});
-    const runner = new JobRunner({ store, agent, root: dir, land });
+    const runner = new JobRunner({ store, agent, root: dir, land, validate: async () => ({ ok: true }) });
     const job = await runner.enqueue("track");
     await waitFor(async () => (await store.get(job.id))?.state === "summary");
     await runner.proceed(job.id);
@@ -257,6 +258,41 @@ describe("AC8 — failure is legible", () => {
     // No package landed, and no widgets/<name> dir was written under the temp root.
     expect(land).not.toHaveBeenCalled();
     expect(existsSync(join(dir, "widgets"))).toBe(false);
+  });
+
+  it("a [[done]] over a MALFORMED staged package fails the job (validate before land) and lands NOTHING", async () => {
+    // C1 regression: the runner must validate the staged package BEFORE landing.
+    // A real agent emitting [[done]] over a broken spec.json/cases.json must not
+    // land a broken widget. With the REAL validator wired and a malformed staged
+    // package, the job ends `failed` with a reason and `land` is never called.
+    const store = new JobStore(join(dir, "jobs"));
+    const agent = new FakeAgentRunner({ scripts: [
+      [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]w[[/summary]]" }],
+      [{ type: "marker", text: "[[done:bad-widget]]" }],
+    ]});
+    const land = vi.fn(async () => {});
+    const runner = new JobRunner({ store, agent, root: dir, land, validate: validateStagedPackage });
+    const job = await runner.enqueue("track");
+    await waitFor(async () => (await store.get(job.id))?.state === "summary");
+
+    // Pre-stage a MALFORMED package before proceeding: spec.json that fails
+    // WidgetSpecSchema. The build turn only starts on proceed(), so staging now
+    // is deterministic.
+    const stageDir = join(dir, ".switchboard", "staging", job.id);
+    mkdirSync(join(stageDir, "golden"), { recursive: true });
+    writeFileSync(join(stageDir, "spec.json"), '{"id":"bad"}');
+    writeFileSync(join(stageDir, "golden", "cases.json"), '{"cases":[]}');
+
+    await runner.proceed(job.id);
+    await waitFor(async () => (await store.get(job.id))?.state === "failed");
+
+    const failed = (await store.get(job.id))!;
+    expect(failed.state).toBe("failed");
+    expect(typeof failed.failureReason).toBe("string");
+    expect(failed.failureReason!.length).toBeGreaterThan(0);
+    // Validation gated landing: nothing was landed.
+    expect(land).not.toHaveBeenCalled();
+    expect(existsSync(join(dir, "widgets", "bad-widget"))).toBe(false);
   });
 });
 describe("AC9 — no credential plumbing", () => {

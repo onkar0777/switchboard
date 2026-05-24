@@ -34,7 +34,7 @@ describe("JobRunner (fake agent)", () => {
       { type: "question", toolUseId: "t1", questions: [{ question: "Which repo?", header: "Repo", options: [{ label: "sb", description: "" }], multiSelect: false }] },
       { type: "marker", text: "[[summary]]builds a PR widget[[/summary]]" },
     ]]});
-    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn() });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(), validate: async () => ({ ok: true }) });
     const job = await runner.enqueue("track my PRs");
 
     await waitFor(async () => (await store.get(job.id))?.state === "clarifying" && Boolean((await store.get(job.id))?.pendingQuestion));
@@ -52,7 +52,7 @@ describe("JobRunner (fake agent)", () => {
       [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]a widget[[/summary]]" }],
       [{ type: "marker", text: "[[phase:implementing]]" }, { type: "marker", text: "[[done:pr-widget]]" }],
     ]});
-    const runner = new JobRunner({ store, agent, root: dir, land });
+    const runner = new JobRunner({ store, agent, root: dir, land, validate: async () => ({ ok: true }) });
     const job = await runner.enqueue("track PRs");
     await waitFor(async () => (await store.get(job.id))?.state === "summary");
     await runner.proceed(job.id);
@@ -67,7 +67,7 @@ describe("JobRunner (fake agent)", () => {
       [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]w[[/summary]]" }],
       [{ type: "question", toolUseId: "t2", questions: [{ question: "Which field?", header: "Field", options: [{ label: "x", description: "" }], multiSelect: false }] }, { type: "marker", text: "[[done:w]]" }],
     ]});
-    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(async () => {}) });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(async () => {}), validate: async () => ({ ok: true }) });
     const job = await runner.enqueue("track");
     await waitFor(async () => (await store.get(job.id))?.state === "summary");
     await runner.proceed(job.id);
@@ -80,7 +80,7 @@ describe("JobRunner (fake agent)", () => {
   it("AC4 (serial): a second enqueue sits in queued while the first is active", async () => {
     const store = new JobStore(join(dir, "jobs"));
     const agent = new FakeAgentRunner({ scripts: [[{ type: "session", id: "s1" }, { type: "question", toolUseId: "t1", questions: [{ question: "Q?", header: "Q", options: [{ label: "a", description: "" }], multiSelect: false }] }]] });
-    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn() });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(), validate: async () => ({ ok: true }) });
     const first = await runner.enqueue("a");
     await waitFor(async () => (await store.get(first.id))?.state === "clarifying");
     const second = await runner.enqueue("b");
@@ -96,7 +96,7 @@ describe("JobRunner (fake agent)", () => {
       { type: "session", id: "s1" },
       { type: "question", toolUseId: "t1", questions: [{ question: "Which repo?", header: "Repo", options: [{ label: "sb", description: "" }], multiSelect: false }] },
     ]] });
-    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn() });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(), validate: async () => ({ ok: true }) });
 
     // Two enqueues with NO await between them → both fire void this.pump()
     // before either has had a chance to transition anything. Pre-fix, both pumps
@@ -139,7 +139,7 @@ describe("JobRunner (fake agent)", () => {
         return { endedTurn: true };
       },
     };
-    const runner = new JobRunner({ store, agent: agent as never, root: dir, land: async () => {} });
+    const runner = new JobRunner({ store, agent: agent as never, root: dir, land: async () => {}, validate: async () => ({ ok: true }) });
     await runner.resumeInterrupted();
     // The runner re-drove the building turn with resume = the stored session id.
     await waitFor(() => resumed.includes("sess-X"));   // <-- waitFor, not a bare expect (avoids the race)
@@ -153,7 +153,7 @@ describe("JobRunner (fake agent)", () => {
       [{ type: "error", message: "MCP server unreachable" }],
     ]});
     const land = vi.fn(async () => {});
-    const runner = new JobRunner({ store, agent, root: dir, land });
+    const runner = new JobRunner({ store, agent, root: dir, land, validate: async () => ({ ok: true }) });
     const job = await runner.enqueue("track");
     await waitFor(async () => (await store.get(job.id))?.state === "summary");
     await runner.proceed(job.id);

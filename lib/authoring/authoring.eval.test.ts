@@ -25,6 +25,7 @@ describe.skipIf(!RUN)("authoring eval (real agent, gated)", () => {
           captured.name = i.widgetName;
           await landPackage(i);
         },
+        validate: validateStagedPackage,
       });
       const job = await runner.enqueue(
         "Track how many of my GitHub PRs merged this week against a target of 5",
