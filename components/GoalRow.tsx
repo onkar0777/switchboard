@@ -1,5 +1,5 @@
 import type { Verdict } from "@/lib/verdicts/types";
-import { pluralize } from "@/lib/verdicts/engine";
+import { pluralize } from "@/lib/format";
 import { EYEBROW } from "@/lib/design-tokens";
 
 export function GoalRow({ verdict }: { verdict: Verdict }) {
