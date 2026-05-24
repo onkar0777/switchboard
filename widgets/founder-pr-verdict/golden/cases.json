@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0",
+  "cases": [
+    {
+      "name": "happy",
+      "given": {
+        "merged": [
+          { "id": "1", "title": "PR 1", "url": "https://github.com/o/r/pull/1", "repo": "o/r", "prNumber": 1, "mergedAt": "2026-05-18T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "2", "title": "PR 2", "url": "https://github.com/o/r/pull/2", "repo": "o/r", "prNumber": 2, "mergedAt": "2026-05-18T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "3", "title": "PR 3", "url": "https://github.com/o/r/pull/3", "repo": "o/r", "prNumber": 3, "mergedAt": "2026-05-19T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "4", "title": "PR 4", "url": "https://github.com/o/r/pull/4", "repo": "o/r", "prNumber": 4, "mergedAt": "2026-05-19T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "5", "title": "PR 5", "url": "https://github.com/o/r/pull/5", "repo": "o/r", "prNumber": 5, "mergedAt": "2026-05-20T08:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" }
+        ],
+        "open": []
+      },
+      "then": {
+        "state": "ok",
+        "value": 5,
+        "status": "good",
+        "verdict": "Shipped: 5/5 PRs this week.",
+        "slotIds": ["verdict", "receipts", "drag", "momentum", "action"],
+        "momentum": [0, 0, 0, 5],
+        "action": ""
+      }
+    },
+    {
+      "name": "boundary",
+      "given": {
+        "merged": [
+          { "id": "1", "title": "PR 1", "url": "https://github.com/o/r/pull/1", "repo": "o/r", "prNumber": 1, "mergedAt": "2026-05-18T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "2", "title": "PR 2", "url": "https://github.com/o/r/pull/2", "repo": "o/r", "prNumber": 2, "mergedAt": "2026-05-18T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "3", "title": "PR 3", "url": "https://github.com/o/r/pull/3", "repo": "o/r", "prNumber": 3, "mergedAt": "2026-05-19T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "4", "title": "PR 4", "url": "https://github.com/o/r/pull/4", "repo": "o/r", "prNumber": 4, "mergedAt": "2026-05-19T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" }
+        ],
+        "open": []
+      },
+      "then": {
+        "state": "ok",
+        "value": 4,
+        "status": "good",
+        "verdict": "On track: 4/5 PRs this week.",
+        "momentum": [0, 0, 0, 4]
+      }
+    },
+    {
+      "name": "over-target",
+      "given": {
+        "merged": [
+          { "id": "1", "title": "PR 1", "url": "https://github.com/o/r/pull/1", "repo": "o/r", "prNumber": 1, "mergedAt": "2026-05-18T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "2", "title": "PR 2", "url": "https://github.com/o/r/pull/2", "repo": "o/r", "prNumber": 2, "mergedAt": "2026-05-18T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "3", "title": "PR 3", "url": "https://github.com/o/r/pull/3", "repo": "o/r", "prNumber": 3, "mergedAt": "2026-05-19T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "4", "title": "PR 4", "url": "https://github.com/o/r/pull/4", "repo": "o/r", "prNumber": 4, "mergedAt": "2026-05-19T12:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "5", "title": "PR 5", "url": "https://github.com/o/r/pull/5", "repo": "o/r", "prNumber": 5, "mergedAt": "2026-05-20T08:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" },
+          { "id": "6", "title": "PR 6", "url": "https://github.com/o/r/pull/6", "repo": "o/r", "prNumber": 6, "mergedAt": "2026-05-20T09:00:00.000Z", "openedAt": "2026-04-27T12:00:00.000Z" }
+        ],
+        "open": []
+      },
+      "then": {
+        "state": "ok",
+        "value": 6,
+        "status": "good",
+        "verdict": "Shipped: 6/5 PRs this week.",
+        "momentum": [0, 0, 0, 6]
+      }
+    },
+    {
+      "name": "empty",
+      "given": { "merged": [], "open": [] },
+      "then": {
+        "state": "ok",
+        "value": 0,
+        "status": "behind",
+        "verdict": "Behind: 0/5 PRs this week. Nothing merged yet — the week is yours.",
+        "momentum": [0, 0, 0, 0]
+      }
+    },
+    {
+      "name": "tool-error",
+      "fault": "tool_error",
+      "then": { "state": "error" }
+    },
+    {
+      "name": "unauthorized",
+      "fault": "unauthorized",
+      "then": { "state": "unauthorized" }
+    }
+  ]
+}
