@@ -4,7 +4,7 @@
 // observable state, the emitted package, dashboard.layout.json, the SSE/question
 // bridge. All driven by the FakeAgentRunner — no network, no real agent.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JobStore } from "./job-store";
@@ -172,7 +172,18 @@ describe("AC6 — success landing", () => {
   it.skip("package exists, id appended to dashboard.layout.json atomically, dock row clears, widget renders", () => {});
 });
 describe("AC7 — emitted package is valid by construction", () => {
-  it.skip("structure + golden + transport-smoke pass over the emitted package", () => {});
+  it("a package in the locked shape passes schema + golden + dry-run", async () => {
+    const { validateStagedPackage } = await import("./validate-package");
+    const res = await validateStagedPackage(join(process.cwd(), "widgets", "founder-pr-verdict"), new Date("2026-05-20T12:00:00.000Z"));
+    expect(res.ok).toBe(true);
+  });
+
+  it("discoverWidgetPackages finds the founder package", async () => {
+    const { discoverWidgetPackages } = await import("@/lib/widgets/registry");
+    const pkgs = discoverWidgetPackages();
+    const names = pkgs.map((p) => p.name);
+    expect(names).toContain("founder-pr-verdict");
+  });
 });
 describe("AC8 — failure is legible", () => {
   it("non-convergence/unreachable MCP → failed with reason, no partial package, Refine/Discard offered", async () => {
@@ -199,5 +210,11 @@ describe("AC8 — failure is legible", () => {
   });
 });
 describe("AC9 — no credential plumbing", () => {
-  it.skip("a build authenticates by inheriting the local login — no cc-creds reader or hand-built Anthropic client", () => {});
+  it("no authoring module reads cc-creds or constructs an Anthropic client", () => {
+    const dir = join(process.cwd(), "lib", "authoring");
+    for (const f of readdirSync(dir).filter((n) => n.endsWith(".ts") && !n.endsWith(".test.ts"))) {
+      const src = readFileSync(join(dir, f), "utf8");
+      expect(src).not.toMatch(/cc-creds|new Anthropic\(|@anthropic-ai\/sdk/);
+    }
+  });
 });
