@@ -91,6 +91,16 @@ Every widget emits the P5 contract: a **verdict** (one sentence) + a **value or 
 
 **Render templates** (4, from the v1.2 spec): `verdict_card` (rich, text-heavy), `scoreboard` (numeric headline + delta), `list` (ranked deeplinked rows), `single_stat` (one number + verdict). In v1.2 all four obey size→treatment and `status`→color; the `status`→volume rules apply in v1.3.
 
+### Add-Widget — Intake Panel & Build Dock
+
+The top-right **Add Widget** button opens a right-side **intake panel** that walks the author through a lightweight authoring conversation: free-text intent input → one-at-a-time clarifying questions → a plain-language **build summary** with **Proceed** and **Give feedback** actions. There is no plan-approval or test-gate step — the summary is a human-readable description of what will be built, not a technical spec review.
+
+- **Intent + feedback textareas:** **JetBrains Mono** (code/hints role, consistent with the Typography section). The input surface looks like a terminal prompt — intentional.
+- **Questions + build summary:** **Fraunces** (editorial voice). Questions read as calm, authoritative prompts; the summary reads like a one-sentence verdict of what the widget will do.
+- **Eyebrows / labels / status chips:** **Geist** (UI/meta role, per Typography section).
+- **In-flight builds** are tracked in a collapsible **build dock** — `⠿ Builds (n)` — anchored bottom-right. The grid stays clean while builds are in progress; a widget only joins the grid once its build reaches `done`, inserted at its **authored order** position (from `dashboard.layout.json`).
+- **Dock status colors** are state affordances, not verdict-band status: amber for `needs_input`, rose for `failed`. These follow the Color section's use of amber/rose but are scoped to `state`, never to the `status` (verdict band) field — consistent with the `state === "ok"` rule that governs status-band color elsewhere in the grid.
+
 ## Motion
 - **Approach:** Minimal-functional. Only motion that aids comprehension.
 - **Loading:** Suspense skeletons matching each widget's layout (decision D3). Each widget is its own server component so first paint streams in.
