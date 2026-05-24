@@ -12,13 +12,11 @@ export interface WidgetPackage {
   spec: WidgetSpec; // parsed + validated spec.json
 }
 
-const WIDGETS_ROOT = resolve(process.cwd(), "widgets");
-
 // Discovers every widgets/<name>/spec.json from disk and validates each spec.
 // A package is a directory under widgets/ that contains a spec.json. Loose
 // root-level *.spec.json files (e.g. the live spec) are intentionally ignored —
 // only the package shape participates in the generic suites.
-export function discoverWidgetPackages(root: string = WIDGETS_ROOT): WidgetPackage[] {
+export function discoverWidgetPackages(root: string = resolve(process.cwd(), "widgets")): WidgetPackage[] {
   const entries = readdirSync(root, { withFileTypes: true });
   const pkgs: WidgetPackage[] = [];
   for (const e of entries) {
