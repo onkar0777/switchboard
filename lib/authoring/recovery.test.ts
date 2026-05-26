@@ -142,8 +142,20 @@ describe("Recovery AC5 — queue no longer wedged", () => {
     await waitFor(async () => (await store.get(b.id))?.state === "clarifying"); // B left queued
   });
 
-  // The discard-driven half of AC5 is implemented in Phase 3 (it.todo here).
-  it.todo("a queued job starts once a parked slot-holder is discarded");
+  it("a queued job starts once a parked slot-holder is discarded", async () => {
+    const store = new JobStore(join(dir, "jobs"));
+    const a = await store.create("A");
+    await store.save({ ...a, state: "summary", summary: "x", sessionId: "sA" });
+    const b = await store.create("B");
+
+    const agent = new FakeAgentRunner({ scripts: [
+      [{ type: "session", id: "sB" }, { type: "question", toolUseId: "tB", questions: aQuestion.questions }], // B intake
+    ]});
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(), validate: async () => ({ ok: true as const }) });
+
+    await runner.discard(a.id);
+    await waitFor(async () => (await store.get(b.id))?.state === "clarifying");
+  });
 });
 
 describe("Recovery — feedback after restart (summary gate)", () => {
@@ -161,7 +173,32 @@ describe("Recovery — feedback after restart (summary gate)", () => {
   });
 });
 
-// Implemented in Phase 3 (runner.discard does not exist yet).
 describe("Recovery AC6 — discard frees the slot + cleans up", () => {
-  it.todo("DELETE removes the job file + staging dir and starts the queued job");
+  it("DELETE removes the job file + staging dir and starts the queued job", async () => {
+    const root = dir;
+    const store = new JobStore(join(root, ".switchboard", "jobs"));
+    const a = await store.create("A");
+    await store.save({ ...a, state: "summary", summary: "x", sessionId: "sA" });
+    const b = await store.create("B");
+    mkdirSync(join(root, ".switchboard", "staging", a.id), { recursive: true });
+
+    const agent = new FakeAgentRunner({ scripts: [
+      [{ type: "session", id: "sB" }, { type: "question", toolUseId: "tB", questions: aQuestion.questions }], // B intake
+    ]});
+    const runner = new JobRunner({ store, agent, root, land: vi.fn(), validate: async () => ({ ok: true as const }) });
+
+    await runner.discard(a.id);
+    expect(existsSync(join(root, ".switchboard", "jobs", `${a.id}.json`))).toBe(false);
+    expect(existsSync(join(root, ".switchboard", "staging", a.id))).toBe(false);
+    await waitFor(async () => (await store.get(b.id))?.state === "clarifying"); // queue served
+  });
+
+  it("discard is idempotent on an already-deleted job", async () => {
+    const store = new JobStore(join(dir, "jobs"));
+    const a = await store.create("A");
+    const runner = new JobRunner({ store, agent: new FakeAgentRunner({ scripts: [] }), root: dir, land: vi.fn(), validate: async () => ({ ok: true as const }) });
+    await runner.discard(a.id);
+    await runner.discard(a.id); // no throw
+    expect(await store.get(a.id)).toBeUndefined();
+  });
 });

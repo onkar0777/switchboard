@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { JobStore } from "./job-store";
 import type { AgentRunner, Marker, QuestionAnswers } from "./agent-runner";
@@ -15,6 +16,15 @@ interface Deps {
   root: string; // repo root
   land: LandFn;
   validate: ValidateFn;
+}
+
+// Thrown into a live waiter (answer/gate settler) when its job is discarded, so
+// the parked turn unwinds instead of hanging forever.
+export class DiscardError extends Error {
+  constructor(jobId: string) {
+    super(`job ${jobId} discarded`);
+    this.name = "DiscardError";
+  }
 }
 
 // Serial orchestrator. One active build at a time; the rest sit queued. Bridges
@@ -62,6 +72,46 @@ export class JobRunner {
     const job = await this.deps.store.create(intent);
     void this.pump();
     return job;
+  }
+
+  // The escape hatch. Idempotent + uniform across clarifying/summary/needs_input/
+  // failed/queued. NOT offered on building (no live-build abort) or done. In
+  // order: (1) settle any live waiter so its parked turn unwinds, (2) delete
+  // durable state (job file + staging) and clear in-memory maps, (3) free + serve
+  // the queue.
+  async discard(jobId: string): Promise<void> {
+    // Peek BEFORE deleting: only a slot-holding state (clarifying/summary/
+    // needs_input) owns `running`. A queued/failed job does not — and a sibling
+    // building job might, so we must never blindly clear `running`.
+    const job = await this.deps.store.get(jobId);
+    const heldSlot = job ? ["clarifying", "summary", "needs_input"].includes(job.state) : false;
+
+    const gate = this.gateResolvers.get(jobId);
+    const ans = this.answerResolvers.get(jobId);
+    const hadLiveWaiter = Boolean(gate || ans);
+
+    // (2) Delete durable state first, so the rejection's failSafe re-read finds
+    // the file already gone and no-ops.
+    await this.deps.store.delete(jobId);
+    await rm(this.stageDir(jobId), { recursive: true, force: true });
+    this.answerResolvers.delete(jobId);
+    this.gateResolvers.delete(jobId);
+    this.pendingDone.delete(jobId);
+    this.mutex.delete(jobId);
+
+    // (1) Settle the live waiter. The rejection unwinds runTurn/awaitGate →
+    // drive()'s try/catch → failSafe (no-op on the deleted file) → drive().finally
+    // frees the slot and pumps. So with a live waiter we DON'T touch the slot here.
+    if (gate) gate.reject(new DiscardError(jobId));
+    if (ans) ans.reject(new DiscardError(jobId));
+
+    // (3) No live drive to free the slot (post-restart cold-parked, or queued/
+    // failed). Free it ourselves IFF this job held it, then always pump (pump is
+    // guarded by `running`, so it no-ops if a sibling build owns the slot).
+    if (!hadLiveWaiter) {
+      if (heldSlot) this.running = false;
+      void this.pump();
+    }
   }
 
   async answer(jobId: string, answers: QuestionAnswers): Promise<void> {
@@ -205,7 +255,9 @@ export class JobRunner {
     if (decision === "proceed") {
       await this.runBuild(jobId, "PROCEED");
     } else {
-      await this.runTurn(jobId, `The user gave feedback: ${decision.feedback}. Re-summarize.`, (await this.lockedGet(jobId))!.sessionId);
+      const job = await this.lockedGet(jobId);
+      if (!job) throw new DiscardError(jobId); // discarded mid-flight: unwind cleanly
+      await this.runTurn(jobId, `The user gave feedback: ${decision.feedback}. Re-summarize.`, job.sessionId);
       await this.awaitGateThenContinue(jobId);
     }
   }
@@ -213,7 +265,9 @@ export class JobRunner {
   // Turn 2+ — build: resume the session with `prompt`, run to [[done]]/[[failed]],
   // then validate-and-land via finishBuild. Shared by drive() and the cold path.
   private async runBuild(jobId: string, prompt: string): Promise<void> {
-    await this.runTurn(jobId, prompt, (await this.lockedGet(jobId))!.sessionId);
+    const job = await this.lockedGet(jobId);
+    if (!job) throw new DiscardError(jobId); // discarded mid-flight: unwind cleanly
+    await this.runTurn(jobId, prompt, job.sessionId);
     await this.finishBuild(jobId);
   }
 
