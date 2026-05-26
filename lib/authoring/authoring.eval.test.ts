@@ -112,15 +112,28 @@ describe.skipIf(!RUN)("authoring eval (real agent, gated)", () => {
       const parked = await store.get(job.id);
       // Only meaningful if it actually parked at a question; otherwise skip the assertion.
       if (parked?.state === "clarifying" && parked.pendingQuestion) {
+        const originalQid = parked.pendingQuestion.toolUseId;
         // "Restart": a fresh runner with empty in-memory handshake over the same store.
         const r2 = new JobRunner({ store, agent: new ClaudeAgentRunner(), root, land: landPackage, validate: validateStagedPackage });
         const q = parked.pendingQuestion.questions[0];
         await r2.answer(job.id, { [q.question]: q.options[0]?.label ?? "the default" });
-        // The cold path must NOT immediately fail; it should advance past clarifying.
-        await new Promise((res) => setTimeout(res, 5000));
-        const after = await store.get(job.id);
+        // The resumed turn runs a REAL agent, which takes far longer than a few
+        // seconds, so poll for ADVANCEMENT rather than checking once. "Advanced" =
+        // the job left clarifying (summary/building/done) OR the agent asked a NEW
+        // question (a different toolUseId — still clarifying, but progressed). The
+        // thing this pins is that the cold-path resume does NOT fail with the
+        // restart-resume error: the SDK accepted the resumed transcript.
+        const advanceDeadline = Date.now() + 8 * 60 * 1000;
+        let after = await store.get(job.id);
+        const advanced = (j: Awaited<ReturnType<typeof store.get>>) =>
+          !!j && (j.state !== "clarifying" || (j.pendingQuestion?.toolUseId ?? originalQid) !== originalQid);
+        while (Date.now() < advanceDeadline) {
+          after = await store.get(job.id);
+          if (after?.state === "failed" || advanced(after)) break;
+          await new Promise((res) => setTimeout(res, 2000));
+        }
         expect(after?.failureReason ?? "").not.toMatch(/couldn't resume session after restart/i);
-        expect(after?.state).not.toBe("clarifying"); // moved on (more Qs, summary, or building)
+        expect(advanced(after)).toBe(true); // resumed session moved on (new Q, summary, or build)
       }
     } finally {
       rmSync(root, { recursive: true, force: true });
