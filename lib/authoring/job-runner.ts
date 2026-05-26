@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { JobStore } from "./job-store";
 import type { AgentRunner, Marker, QuestionAnswers } from "./agent-runner";
-import type { Job, JobEvent } from "./job-types";
+import type { Job, JobEvent, JobState } from "./job-types";
 import { transition } from "./state-machine";
 
 type LandFn = (input: { root: string; stageDir: string; widgetName: string }) => Promise<void>;
@@ -167,6 +167,48 @@ export class JobRunner {
   private async runBuild(jobId: string, prompt: string): Promise<void> {
     await this.runTurn(jobId, prompt, (await this.lockedGet(jobId))!.sessionId);
     await this.finishBuild(jobId);
+  }
+
+  // Post-restart cold path: no live resolver exists. Validate the parked state,
+  // claim the serial slot SYNCHRONOUSLY (before any await, like pump()), apply
+  // the entry transition, then spawn a continuation that re-spawns the agent
+  // from the persisted sessionId and runs to the next durable stop. A concurrent
+  // POST while a cold resume is in flight sees running===true → 409 ("runner
+  // busy"). On any failure the continuation fails the job legibly with a reason
+  // that names the resume — "fail legibly + Discard", no retry.
+  private async coldResume(
+    jobId: string,
+    expectStates: JobState[],
+    entry: JobEvent,
+    continuation: (job: Job) => Promise<void>,
+    notReadyMsg: string,
+  ): Promise<void> {
+    if (this.running) throw new Error("runner busy");
+    this.running = true;
+    let job: Job;
+    try {
+      const parked = await this.lockedGet(jobId);
+      if (!parked || !expectStates.includes(parked.state)) throw new Error(notReadyMsg);
+      job = await this.apply(jobId, entry); // persisted, post-transition job
+    } catch (e) {
+      this.running = false;
+      throw e; // surfaces as the route's 409 (not-ready) or "runner busy"
+    }
+    const resumed = job;
+    void continuation(resumed)
+      .catch((e) => this.failSafe(jobId, `couldn't resume session after restart: ${(e as Error).message}`))
+      .finally(() => {
+        this.running = false;
+        void this.pump(); // serve the queue once the slot frees
+      });
+  }
+
+  // Self-contained resume prompt that injects the user's answer into a resumed
+  // session (the parked turn's tool_use is gone after a restart). See the spec's
+  // "known risk": pin real SDK behavior in the gated eval (Task 14).
+  private answerPrompt(answers: QuestionAnswers): string {
+    const parts = Object.entries(answers).map(([q, a]) => `${q}: ${Array.isArray(a) ? a.join(", ") : a}`);
+    return `The user answered — ${parts.join("; ")}. Continue.`;
   }
 
   private async finishBuild(jobId: string): Promise<void> {
