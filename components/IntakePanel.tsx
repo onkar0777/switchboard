@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Job } from "@/lib/authoring/job-types";
 import { EYEBROW } from "@/lib/design-tokens";
+import { SummaryMarkdown } from "./SummaryMarkdown";
 
 // The focused intake surface (DESIGN.md Add-Widget panel). Opens from the
 // top-right button. Submits an intent, then renders the orchestrator's
@@ -63,7 +64,7 @@ export function IntakePanel({ onClose, onBuilding }: { onClose: () => void; onBu
       )}
 
       {job?.state === "clarifying" && job.pendingQuestion && (
-        <QuestionForm pending={job.pendingQuestion} onAnswer={answer} />
+        <QuestionForm key={job.pendingQuestion.toolUseId} pending={job.pendingQuestion} onAnswer={answer} />
       )}
       {job?.state === "clarifying" && !job.pendingQuestion && (
         <p className="mt-6 text-sm text-stone-500">Thinking…</p>
@@ -72,7 +73,7 @@ export function IntakePanel({ onClose, onBuilding }: { onClose: () => void; onBu
       {job?.state === "summary" && (
         <div className="mt-6 space-y-4">
           <p className={EYEBROW}>Build summary</p>
-          <p className="font-serif text-[22px] leading-snug">{job.summary}</p>
+          <SummaryMarkdown text={job.summary ?? ""} />
           <div className="flex gap-3">
             <button onClick={proceed} className="border border-emerald-700 px-4 py-2 text-sm text-emerald-700">Proceed</button>
           </div>
@@ -89,6 +90,7 @@ export function IntakePanel({ onClose, onBuilding }: { onClose: () => void; onBu
 
 function QuestionForm({ pending, onAnswer }: { pending: NonNullable<Job["pendingQuestion"]>; onAnswer: (a: Record<string, string | string[]>) => void }) {
   const q = pending.questions[0];
+  const [custom, setCustom] = useState("");
   return (
     <div className="mt-6 space-y-3">
       <p className={EYEBROW}>{q.header}</p>
@@ -101,6 +103,18 @@ function QuestionForm({ pending, onAnswer }: { pending: NonNullable<Job["pending
             {o.description && <span className="block text-stone-500">{o.description}</span>}
           </button>
         ))}
+      </div>
+      {/* Free-text escape hatch: the options are suggestions, not a closed set. */}
+      <div className="space-y-2 border-t border-stone-200 pt-3">
+        <p className={EYEBROW}>Or answer in your own words</p>
+        <textarea value={custom} onChange={(e) => setCustom(e.target.value)} rows={2}
+          className="w-full border border-stone-300 bg-white p-2 font-mono text-sm"
+          placeholder="Type a different answer…"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && custom.trim()) onAnswer({ [q.question]: custom.trim() });
+          }} />
+        <button onClick={() => onAnswer({ [q.question]: custom.trim() })} disabled={!custom.trim()}
+          className="text-sm text-stone-700 underline disabled:opacity-40">Submit answer</button>
       </div>
     </div>
   );
