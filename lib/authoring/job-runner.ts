@@ -137,29 +137,33 @@ export class JobRunner {
       // Turn 1 — intake: brainstorming until [[summary]] ends the turn.
       await this.runTurn(jobId, this.intakePrompt(jobId, intent), undefined);
 
-      // Wait for the summary gate decision.
-      const decision = await new Promise<"proceed" | { feedback: string }>((res) => this.gateResolvers.set(jobId, res));
-
-      if (typeof decision === "object") {
-        // Feedback loop: resume with the feedback, expect a new summary, re-gate.
-        // (Recurse for simplicity; depth is user-bounded.)
-        await this.runTurn(jobId, `The user gave feedback: ${decision.feedback}. Re-summarize.`, (await this.lockedGet(jobId))!.sessionId);
-        const again = await new Promise<"proceed" | { feedback: string }>((res) => this.gateResolvers.set(jobId, res));
-        if (typeof again === "object") return this.driveFeedbackThenBuild(jobId, again.feedback);
-      }
-
-      // Turn 2 — build: resume with PROCEED, run to [[done]] or [[failed]].
-      await this.runTurn(jobId, "PROCEED", (await this.lockedGet(jobId))!.sessionId);
-      await this.finishBuild(jobId);
+      // Hand off to the shared gate tail (also re-entered by the cold path).
+      await this.awaitGateThenContinue(jobId);
     } catch (e) {
       await this.failSafe(jobId, (e as Error).message);
     }
   }
 
-  private async driveFeedbackThenBuild(jobId: string, feedback: string): Promise<void> {
-    await this.runTurn(jobId, `The user gave feedback: ${feedback}. Re-summarize.`, (await this.lockedGet(jobId))!.sessionId);
-    await new Promise<"proceed" | { feedback: string }>((res) => this.gateResolvers.set(jobId, res));
-    await this.runTurn(jobId, "PROCEED", (await this.lockedGet(jobId))!.sessionId);
+  // The summary-gate tail, shared by drive() and the post-restart cold path.
+  // Sets the gate resolver, awaits the decision: `proceed` builds; `feedback`
+  // re-summarizes and recurses (depth is user-bounded). Replaces the old
+  // driveFeedbackThenBuild duplication.
+  private async awaitGateThenContinue(jobId: string): Promise<void> {
+    const decision = await new Promise<"proceed" | { feedback: string }>((res) =>
+      this.gateResolvers.set(jobId, res),
+    );
+    if (decision === "proceed") {
+      await this.runBuild(jobId, "PROCEED");
+    } else {
+      await this.runTurn(jobId, `The user gave feedback: ${decision.feedback}. Re-summarize.`, (await this.lockedGet(jobId))!.sessionId);
+      await this.awaitGateThenContinue(jobId);
+    }
+  }
+
+  // Turn 2+ — build: resume the session with `prompt`, run to [[done]]/[[failed]],
+  // then validate-and-land via finishBuild. Shared by drive() and the cold path.
+  private async runBuild(jobId: string, prompt: string): Promise<void> {
+    await this.runTurn(jobId, prompt, (await this.lockedGet(jobId))!.sessionId);
     await this.finishBuild(jobId);
   }
 
