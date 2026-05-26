@@ -22,8 +22,10 @@ interface Deps {
 // the summary gate via a per-job proceed/feedback resolver. Landing happens only
 // after a `[[done]]` marker and a successful `land()`.
 export class JobRunner {
-  private answerResolvers = new Map<string, (a: QuestionAnswers) => void>();
-  private gateResolvers = new Map<string, (decision: "proceed" | { feedback: string }) => void>();
+  // Settlers (resolve + reject) so discard can REJECT a live waiter and unwind
+  // its parked turn instead of leaving the Promise to hang forever.
+  private answerResolvers = new Map<string, { resolve: (a: QuestionAnswers) => void; reject: (e: Error) => void }>();
+  private gateResolvers = new Map<string, { resolve: (decision: "proceed" | { feedback: string }) => void; reject: (e: Error) => void }>();
   private running = false;
   // Serializes read-modify-write on the store so concurrently-emitted markers
   // (e.g. [[phase]] then [[done]] within one fire-and-forget turn) don't clobber
@@ -63,28 +65,28 @@ export class JobRunner {
   }
 
   async answer(jobId: string, answers: QuestionAnswers): Promise<void> {
-    const resolve = this.answerResolvers.get(jobId);
-    if (!resolve) throw new Error(`no pending question for job ${jobId}`);
+    const settler = this.answerResolvers.get(jobId);
+    if (!settler) throw new Error(`no pending question for job ${jobId}`);
     this.answerResolvers.delete(jobId);
     // Optimistically clear the pending question; the agent turn continues.
     await this.apply(jobId, { kind: "answer" });
-    resolve(answers);
+    settler.resolve(answers);
   }
 
   async proceed(jobId: string): Promise<void> {
-    const resolve = this.gateResolvers.get(jobId);
-    if (!resolve) throw new Error(`no summary gate open for job ${jobId}`);
+    const settler = this.gateResolvers.get(jobId);
+    if (!settler) throw new Error(`no summary gate open for job ${jobId}`);
     this.gateResolvers.delete(jobId);
     await this.apply(jobId, { kind: "proceed" });
-    resolve("proceed");
+    settler.resolve("proceed");
   }
 
   async feedback(jobId: string, text: string): Promise<void> {
-    const resolve = this.gateResolvers.get(jobId);
-    if (!resolve) throw new Error(`no summary gate open for job ${jobId}`);
+    const settler = this.gateResolvers.get(jobId);
+    if (!settler) throw new Error(`no summary gate open for job ${jobId}`);
     this.gateResolvers.delete(jobId);
     await this.apply(jobId, { kind: "feedback" });
-    resolve({ feedback: text });
+    settler.resolve({ feedback: text });
   }
 
   private async apply(jobId: string, event: JobEvent): Promise<Job> {
@@ -149,8 +151,8 @@ export class JobRunner {
   // re-summarizes and recurses (depth is user-bounded). Replaces the old
   // driveFeedbackThenBuild duplication.
   private async awaitGateThenContinue(jobId: string): Promise<void> {
-    const decision = await new Promise<"proceed" | { feedback: string }>((res) =>
-      this.gateResolvers.set(jobId, res),
+    const decision = await new Promise<"proceed" | { feedback: string }>((resolve, reject) =>
+      this.gateResolvers.set(jobId, { resolve, reject }),
     );
     if (decision === "proceed") {
       await this.runBuild(jobId, "PROCEED");
@@ -239,7 +241,7 @@ export class JobRunner {
         onMarker: (m) => void this.onMarker(jobId, m),
         onQuestion: async (pending) => {
           await this.apply(jobId, { kind: "question", pending });
-          return new Promise<QuestionAnswers>((res) => this.answerResolvers.set(jobId, res));
+          return new Promise<QuestionAnswers>((resolve, reject) => this.answerResolvers.set(jobId, { resolve, reject }));
         },
       },
     );
