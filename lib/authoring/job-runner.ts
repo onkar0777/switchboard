@@ -75,10 +75,20 @@ export class JobRunner {
 
   async proceed(jobId: string): Promise<void> {
     const settler = this.gateResolvers.get(jobId);
-    if (!settler) throw new Error(`no summary gate open for job ${jobId}`);
-    this.gateResolvers.delete(jobId);
-    await this.apply(jobId, { kind: "proceed" });
-    settler.resolve("proceed");
+    if (settler) {
+      this.gateResolvers.delete(jobId);
+      await this.apply(jobId, { kind: "proceed" });
+      settler.resolve("proceed");
+      return;
+    }
+    // Cold path (post-restart): no live gate. Reattach and build.
+    await this.coldResume(
+      jobId,
+      ["summary"],
+      { kind: "proceed" },
+      () => this.runBuild(jobId, "PROCEED"),
+      `no summary gate open for job ${jobId}`,
+    );
   }
 
   async feedback(jobId: string, text: string): Promise<void> {

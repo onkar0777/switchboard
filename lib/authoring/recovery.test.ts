@@ -48,7 +48,7 @@ function stageFounder(root: string, jobId: string): void {
   writeFileSync(join(stageDir, "golden", "cases.json"), readFileSync(join(founder, "golden", "cases.json"), "utf8"));
 }
 
-describe.skip("Recovery AC1 — proceed after restart (summary gate)", () => {
+describe("Recovery AC1 — proceed after restart (summary gate)", () => {
   it("a summary-parked job with a sessionId builds to done + landed on a fresh runner", async () => {
     const root = dir;
     const store = new JobStore(join(root, ".switchboard", "jobs"));
@@ -58,7 +58,13 @@ describe.skip("Recovery AC1 — proceed after restart (summary gate)", () => {
 
     // Fresh runner (the "restart"): the resumed PROCEED turn emits [[done]].
     const agent = new FakeAgentRunner({ scripts: [[{ type: "marker", text: "[[done:test-widget]]" }]] });
-    const runner = new JobRunner({ store, agent, root, land: landPackage, validate: validateStagedPackage });
+    // Pin the validator clock to the founder fixture's PR week (see acceptance.test.ts AC6):
+    // the runner validates with new Date(), but the founder golden "happy" verdict is only
+    // correct when "now" is in that week. Keeps AC1 a deterministic test of the real land path.
+    const runner = new JobRunner({
+      store, agent, root, land: landPackage,
+      validate: (dir) => validateStagedPackage(dir, new Date("2026-05-21T00:00:00.000Z")),
+    });
 
     await runner.proceed(created.id);
     await waitFor(
