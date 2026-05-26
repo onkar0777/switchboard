@@ -76,22 +76,16 @@ export class JobRunner {
 
   // The escape hatch. Idempotent + uniform across clarifying/summary/needs_input/
   // failed/queued. NOT offered on building (no live-build abort) or done. In
-  // order: (1) settle any live waiter so its parked turn unwinds, (2) delete
-  // durable state (job file + staging) and clear in-memory maps, (3) free + serve
-  // the queue.
+  // order: (1) delete durable state (job file + staging) and clear in-memory maps
+  // — first, so a rejected waiter's failSafe re-read no-ops; (2) settle any live
+  // waiter so its parked turn unwinds; (3) serve the queue.
   async discard(jobId: string): Promise<void> {
-    // Peek BEFORE deleting: only a slot-holding state (clarifying/summary/
-    // needs_input) owns `running`. A queued/failed job does not — and a sibling
-    // building job might, so we must never blindly clear `running`.
-    const job = await this.deps.store.get(jobId);
-    const heldSlot = job ? ["clarifying", "summary", "needs_input"].includes(job.state) : false;
-
     const gate = this.gateResolvers.get(jobId);
     const ans = this.answerResolvers.get(jobId);
     const hadLiveWaiter = Boolean(gate || ans);
 
-    // (2) Delete durable state first, so the rejection's failSafe re-read finds
-    // the file already gone and no-ops.
+    // (1) Delete durable state first, so a rejected waiter's failSafe re-read
+    // finds the file already gone and no-ops.
     await this.deps.store.delete(jobId);
     await rm(this.stageDir(jobId), { recursive: true, force: true });
     this.answerResolvers.delete(jobId);
@@ -99,17 +93,20 @@ export class JobRunner {
     this.pendingDone.delete(jobId);
     this.mutex.delete(jobId);
 
-    // (1) Settle the live waiter. The rejection unwinds runTurn/awaitGate →
+    // (2) Settle the live waiter. The rejection unwinds runTurn/awaitGate →
     // drive()'s try/catch → failSafe (no-op on the deleted file) → drive().finally
     // frees the slot and pumps. So with a live waiter we DON'T touch the slot here.
     if (gate) gate.reject(new DiscardError(jobId));
     if (ans) ans.reject(new DiscardError(jobId));
 
-    // (3) No live drive to free the slot (post-restart cold-parked, or queued/
-    // failed). Free it ourselves IFF this job held it, then always pump (pump is
-    // guarded by `running`, so it no-ops if a sibling build owns the slot).
+    // (3) No live waiter, so no drive() will free the slot for us — but we still
+    // never clear `running` ourselves. A cold-parked/queued/failed job left it
+    // false; a coldResume in flight for THIS job owns it and clears it via its
+    // own catch (deleting the file above makes that coldResume fail and unwind,
+    // and its catch pumps too). pump() is guarded by `running`, so it no-ops if a
+    // coldResume or a sibling build still owns the slot, and serves the queue
+    // otherwise.
     if (!hadLiveWaiter) {
-      if (heldSlot) this.running = false;
       void this.pump();
     }
   }
@@ -293,12 +290,22 @@ export class JobRunner {
       if (!parked || !expectStates.includes(parked.state)) throw new Error(notReadyMsg);
       job = await this.apply(jobId, entry); // persisted, post-transition job
     } catch (e) {
+      // Couldn't even start the resume (missing job / wrong state — e.g. the job
+      // was discarded during the lockedGet above). Free the slot AND serve the
+      // queue, so a discard that races a cold resume never wedges the next job.
       this.running = false;
+      void this.pump();
       throw e; // surfaces as the route's 409 (not-ready) or "runner busy"
     }
     const resumed = job;
     void continuation(resumed)
-      .catch((e) => this.failSafe(jobId, `couldn't resume session after restart: ${(e as Error).message}`))
+      .catch((e) => {
+        // A DiscardError means the job was discarded mid-flight: a clean exit, not
+        // a resume failure. failSafe would no-op on the deleted file anyway; skip
+        // it so the reason is never mislabeled.
+        if (e instanceof DiscardError) return;
+        return this.failSafe(jobId, `couldn't resume session after restart: ${(e as Error).message}`);
+      })
       .finally(() => {
         this.running = false;
         void this.pump(); // serve the queue once the slot frees
