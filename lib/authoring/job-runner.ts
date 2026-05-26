@@ -66,11 +66,30 @@ export class JobRunner {
 
   async answer(jobId: string, answers: QuestionAnswers): Promise<void> {
     const settler = this.answerResolvers.get(jobId);
-    if (!settler) throw new Error(`no pending question for job ${jobId}`);
-    this.answerResolvers.delete(jobId);
-    // Optimistically clear the pending question; the agent turn continues.
-    await this.apply(jobId, { kind: "answer" });
-    settler.resolve(answers);
+    if (settler) {
+      this.answerResolvers.delete(jobId);
+      // Optimistically clear the pending question; the agent turn continues.
+      await this.apply(jobId, { kind: "answer" });
+      settler.resolve(answers);
+      return;
+    }
+    // Cold path (post-restart): re-spawn the session with the answer injected.
+    // {kind:"answer"} keeps a clarifying job clarifying (clears the question)
+    // and moves a needs_input job to building; the continuation branches on that
+    // post-apply state — clarifying expects a new summary (re-gate), building
+    // finishes the build.
+    const prompt = this.answerPrompt(answers);
+    await this.coldResume(
+      jobId,
+      ["clarifying", "needs_input"],
+      { kind: "answer" },
+      async (job) => {
+        await this.runTurn(jobId, prompt, job.sessionId);
+        if (job.state === "clarifying") await this.awaitGateThenContinue(jobId);
+        else await this.finishBuild(jobId);
+      },
+      `no pending question for job ${jobId}`,
+    );
   }
 
   async proceed(jobId: string): Promise<void> {

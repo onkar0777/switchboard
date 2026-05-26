@@ -75,7 +75,7 @@ describe("Recovery AC1 — proceed after restart (summary gate)", () => {
   });
 });
 
-describe.skip("Recovery AC2 — answer after restart (clarifying)", () => {
+describe("Recovery AC2 — answer after restart (clarifying)", () => {
   it("a clarifying-parked job with pendingQuestion + sessionId clears the question and reaches summary", async () => {
     const store = new JobStore(join(dir, "jobs"));
     const created = await store.create("track PRs");
@@ -91,7 +91,7 @@ describe.skip("Recovery AC2 — answer after restart (clarifying)", () => {
   });
 });
 
-describe.skip("Recovery AC3 — answer after restart (needs_input)", () => {
+describe("Recovery AC3 — answer after restart (needs_input)", () => {
   it("a needs_input-parked job with sessionId continues the build to done", async () => {
     const root = dir;
     const store = new JobStore(join(root, ".switchboard", "jobs"));
