@@ -91,15 +91,21 @@ Every widget emits the P5 contract: a **verdict** (one sentence) + a **value or 
 
 **Render templates** (4, from the v1.2 spec): `verdict_card` (rich, text-heavy), `scoreboard` (numeric headline + delta), `list` (ranked deeplinked rows), `single_stat` (one number + verdict). In v1.2 all four obey size→treatment and `status`→color; the `status`→volume rules apply in v1.3.
 
-### Add-Widget — Intake Panel & Build Dock
+### Add-Widget — One Collapsible Authoring Surface
 
-The top-right **Add Widget** button opens a right-side **intake panel** that walks the author through a lightweight authoring conversation: free-text intent input → one-at-a-time clarifying questions → a plain-language **build summary** with **Proceed** and **Give feedback** actions. There is no plan-approval or test-gate step — the summary is a human-readable description of what will be built, not a technical spec review.
+The **+ Add widget** button is gated: it is visible only when no current job exists. Clicking it opens the **authoring surface** — a single collapsible element bound to the one in-flight job. The authoring conversation runs inside it: free-text intent input → one-at-a-time clarifying questions → a plain-language **build summary** with **Proceed** and **Give feedback** actions. There is no plan-approval or test-gate step — the summary is a human-readable description of what will be built, not a technical spec review.
+
+The surface has two modes, driven by `state` with a manual toggle respected until the state changes:
+
+- **Expanded** (focal right sidebar): shown whenever the build needs the user — `clarifying`, `needs_input`, `summary`, `failed`. Hosts intent entry, clarifying questions one at a time, the plain-language build summary with **Proceed** / Give feedback, and the failed reason. An understated ink/stone-500 underlined **Discard** link is the escape hatch (available in all states except `building` and `done`).
+- **Collapsed** (bottom-right `⠿` chip): shown while the build is autonomous — `queued`, `building`. The chip is ignorable; the grid stays clean. The collapse/expand control uses the DESIGN.md **short** ease transition (150–250ms). Expanding from the chip always shows the expanded sidebar for the bound job.
+
+Recovery is the default behavior: on load the surface simply renders the current job in the mode its `state` implies — expanded if it needs the user, a chip while building/queued. There is no separate "Resume" branch; rehydration and a fresh flow follow the same path.
 
 - **Intent + feedback textareas:** **JetBrains Mono** (code/hints role, consistent with the Typography section). The input surface looks like a terminal prompt — intentional.
 - **Questions + build summary:** **Fraunces** (editorial voice). Questions read as calm, authoritative prompts; the summary reads like a one-sentence verdict of what the widget will do.
-- **Eyebrows / labels / status chips:** **Geist** (UI/meta role, per Typography section).
-- **In-flight builds** are tracked in a collapsible **build dock** — `⠿ Builds (n)` — anchored bottom-right. The grid stays clean while builds are in progress; a widget only joins the grid once its build reaches `done`, inserted at its **authored order** position (from `dashboard.layout.json`).
-- **Dock status colors** are state affordances, not verdict-band status: amber for `needs_input`, rose for `failed`. These follow the Color section's use of amber/rose but are scoped to `state`, never to the `status` (verdict band) field — consistent with the `state === "ok"` rule that governs status-band color elsewhere in the grid.
+- **Eyebrows / labels / state chips:** **Geist** (UI/meta role, per Typography section).
+- **State affordance colors** are scoped to `state`, never to the `status` (verdict band) field: amber for `needs_input`, rose for `failed`; emerald **Proceed** button. These follow the Color section's use of amber/rose/emerald but are strictly `state` affordances — consistent with the `state === "ok"` rule that governs status-band color elsewhere in the grid.
 
 ## Motion
 - **Approach:** Minimal-functional. Only motion that aids comprehension.
@@ -119,3 +125,4 @@ The top-right **Add Widget** button opens a right-side **intake panel** that wal
 | 2026-05-20 | **Status band mapping handles enum/boolean outcomes, not just numeric thresholds** | Codex flagged that GitHub PR verdicts hinge on booleans/enums/age/failed-checks, not only numeric compares; the band→status map must not assume numeric dominance |
 | 2026-05-20 | Defer pinned North Star slot + progressive receipt disclosure | Net-new scope; both add a runtime concept that doesn't exist yet. Later version |
 | 2026-05-20 | `verdict_card` stays first-class; renders fewer slots at M/S rather than hiding receipts | Protects the v1 screenshot magic without bloating the grid; consistent with deferring progressive disclosure |
+| 2026-05-26 | **Merge intake panel + build dock into one collapsible authoring surface; the dock becomes its collapsed state** | In-flight job recovery design: a single surface bound to the one current job makes restart-recovery the default rehydration path (no panel↔dock handoff, no "+ Add widget vs Resume" branching). Discard is the escape hatch; no auto-expire, no Refine |
