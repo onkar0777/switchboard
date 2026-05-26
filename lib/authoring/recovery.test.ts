@@ -107,7 +107,7 @@ describe("Recovery AC3 — answer after restart (needs_input)", () => {
   });
 });
 
-describe.skip("Recovery AC4 — resume failure fails legibly", () => {
+describe("Recovery AC4 — resume failure fails legibly", () => {
   it("a job whose session cannot be resumed reaches failed with a clear reason and frees the slot", async () => {
     const store = new JobStore(join(dir, "jobs"));
     const created = await store.create("track PRs");
