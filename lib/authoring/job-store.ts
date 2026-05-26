@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Job, JobState } from "./job-types";
 
@@ -58,5 +58,11 @@ export class JobStore {
 
   async nextQueued(): Promise<Job | undefined> {
     return (await this.list()).find((j) => j.state === "queued");
+  }
+
+  // Remove the durable job file. Idempotent: a missing file is not an error
+  // (discard is uniform across states and safe to call twice).
+  async delete(id: string): Promise<void> {
+    await rm(this.path(id), { force: true });
   }
 }

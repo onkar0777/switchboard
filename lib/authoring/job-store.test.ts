@@ -43,4 +43,13 @@ describe("JobStore", () => {
     expect(await store.findActive()).toBeUndefined();
     expect((await store.nextQueued())?.id).toBe(b.id);
   });
+
+  it("delete removes the job file; get then returns undefined and is idempotent", async () => {
+    const store = new JobStore(join(dir, "jobs"));
+    const job = await store.create("track");
+    expect(await store.get(job.id)).toBeDefined();
+    await store.delete(job.id);
+    expect(await store.get(job.id)).toBeUndefined();
+    await store.delete(job.id); // idempotent — no throw on a missing file
+  });
 });
