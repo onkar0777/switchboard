@@ -67,12 +67,14 @@ describe("Recovery AC1 — proceed after restart (summary gate)", () => {
     });
 
     await runner.proceed(created.id);
-    await waitFor(
-      () => existsSync(join(root, "widgets", "test-widget", "spec.json")) && existsSync(join(root, "dashboard.layout.json")),
-      5000,
-    );
-    expect((await store.get(created.id))?.state).toBe("done");
-  });
+    // `done` is the FINAL step of finishBuild (validate → land writes the files →
+    // apply done), so polling state==="done" is the race-free completion signal;
+    // once done, the landed files are guaranteed present. Generous budget: the
+    // validate dry-run starts a stub-MCP server whose startup lags under load.
+    await waitFor(async () => (await store.get(created.id))?.state === "done", 20000);
+    expect(existsSync(join(root, "widgets", "test-widget", "spec.json"))).toBe(true);
+    expect(existsSync(join(root, "dashboard.layout.json"))).toBe(true);
+  }, 30000);
 });
 
 describe("Recovery AC2 — answer after restart (clarifying)", () => {

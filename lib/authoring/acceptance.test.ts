@@ -213,12 +213,12 @@ describe("AC6 — success landing", () => {
       // [[done]] marker flips state to "done" during the turn, but finishBuild's
       // landPackage runs after the turn resolves. Polling the filesystem (rather
       // than the state) closes that race under parallel test load.
-      await waitFor(
-        () =>
-          existsSync(join(root, "widgets", "test-widget", "spec.json")) &&
-          existsSync(join(root, "dashboard.layout.json")),
-        5000,
-      );
+      // `done` is the FINAL step of finishBuild (validate → land writes the files
+      // → apply done), so polling state==="done" is the race-free completion
+      // signal; once done the landed files are guaranteed present. Generous
+      // budget: the validate dry-run starts a stub-MCP server whose startup lags
+      // under full-suite parallel load.
+      await waitFor(async () => (await store.get(job.id))?.state === "done", 20000);
       expect((await store.get(job.id))?.state).toBe("done");
 
       // The real landPackage published the staged package under widgets/<id>.
@@ -230,7 +230,7 @@ describe("AC6 — success landing", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
+  }, 30000);
 });
 describe("AC7 — emitted package is valid by construction", () => {
   it("a package in the locked shape passes schema + golden + dry-run", async () => {
