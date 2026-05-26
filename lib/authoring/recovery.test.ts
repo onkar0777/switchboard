@@ -124,7 +124,7 @@ describe("Recovery AC4 — resume failure fails legibly", () => {
   });
 });
 
-describe.skip("Recovery AC5 — queue no longer wedged", () => {
+describe("Recovery AC5 — queue no longer wedged", () => {
   it("a queued job starts once a parked slot-holder is resumed to a terminal state", async () => {
     const store = new JobStore(join(dir, "jobs"));
     const a = await store.create("A");
