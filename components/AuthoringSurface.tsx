@@ -45,10 +45,14 @@ export function AuthoringSurface({
       else { onGone(job.id); es.close(); }
     };
     return () => es.close();
+    // onUpdate/onGone excluded deliberately: they use functional setJobs((prev) => …)
+    // in the host, so the captured references are update-safe. Re-subscribing on
+    // every parent render would thrash the SSE connection for no benefit.
   }, [job?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function submitIntent() {
     const res = await fetch("/api/widgets", { method: "POST", body: JSON.stringify({ intent }) });
+    if (!res.ok) return; // keep the typed intent so the user can retry on failure
     const { job: created } = (await res.json()) as { job: Job };
     setIntent("");
     onCreated(created);
@@ -64,8 +68,8 @@ export function AuthoringSurface({
     setFeedback("");
   }
   async function discard() {
-    await fetch(`/api/widgets/${job!.id}`, { method: "DELETE" });
-    onGone(job!.id); // optimistic: drop locally on the 200
+    const res = await fetch(`/api/widgets/${job!.id}`, { method: "DELETE" });
+    if (res.ok) onGone(job!.id); // drop locally once the DELETE 200 confirms
   }
 
   // --- Intent entry (no bound job) — expanded sidebar -----------------------
