@@ -379,7 +379,11 @@ export class JobRunner {
       });
     } else if (active.state === "building") {
       await this.failSafe(active.id, "session could not be resumed after restart");
+      void this.pump(); // the slot-holder is now terminal — serve the queue
     }
+    // summary/clarifying/needs_input parked jobs are intentionally NOT pumped:
+    // they still hold the slot pending the user's next action (the cold path),
+    // which serves the queue when they reach a terminal state or are discarded.
   }
 
   // One query() turn. Wires agent events → state machine + the question bridge.

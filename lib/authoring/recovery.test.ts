@@ -160,6 +160,24 @@ describe("Recovery AC5 — queue no longer wedged", () => {
   });
 });
 
+describe("Recovery — boot: an unresumable building job frees the queue", () => {
+  it("a building job with no sessionId fails on boot AND lets a queued job start", async () => {
+    const store = new JobStore(join(dir, "jobs"));
+    const a = await store.create("A");
+    await store.save({ ...a, state: "building" }); // interrupted before any session was saved
+    const b = await store.create("B");
+
+    const agent = new FakeAgentRunner({ scripts: [
+      [{ type: "session", id: "sB" }, { type: "question", toolUseId: "tB", questions: aQuestion.questions }], // B intake
+    ]});
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(), validate: async () => ({ ok: true as const }) });
+
+    await runner.resumeInterrupted();
+    await waitFor(async () => (await store.get(a.id))?.state === "failed");
+    await waitFor(async () => (await store.get(b.id))?.state === "clarifying"); // queue served, not wedged
+  });
+});
+
 describe("Recovery — feedback after restart (summary gate)", () => {
   it("a summary-parked job re-summarizes from the resumed session on feedback", async () => {
     const store = new JobStore(join(dir, "jobs"));
