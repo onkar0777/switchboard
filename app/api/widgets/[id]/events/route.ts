@@ -31,15 +31,27 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     async start(ctrl) {
       controller = ctrl;
 
+      let seen = false;
       const send = async () => {
         if (stopped) return;
 
         const job = await store.get(params.id);
+        if (job) seen = true;
         const snapshot = JSON.stringify(job ?? null);
 
         if (!stopped && snapshot !== last) {
           last = snapshot;
           controller.enqueue(encoder.encode(`data: ${snapshot}\n\n`));
+        }
+
+        // A previously-seen job that is now gone (discarded): the final `data:
+        // null` above told the client; close the stream so it stops cleanly.
+        if (seen && !job) {
+          if (!stopped) {
+            stopped = true;
+            controller.close();
+          }
+          return;
         }
 
         if (job && (job.state === "done" || job.state === "failed")) {
