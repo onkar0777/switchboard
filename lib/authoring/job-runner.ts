@@ -85,6 +85,10 @@ export class JobRunner {
       { kind: "answer" },
       async (job) => {
         await this.runTurn(jobId, prompt, job.sessionId);
+        // `job` is the POST-apply snapshot: answer keeps clarifying→clarifying
+        // (re-gate the next summary) and moves needs_input→building (finish the
+        // build). If the state machine ever changed clarifying's answer edge,
+        // this sentinel would need to change with it.
         if (job.state === "clarifying") await this.awaitGateThenContinue(jobId);
         else await this.finishBuild(jobId);
       },
@@ -105,6 +109,8 @@ export class JobRunner {
       jobId,
       ["summary"],
       { kind: "proceed" },
+      // runBuild re-reads sessionId from the store (write-once), so unlike the
+      // answer/feedback continuations it needn't thread the snapshot's sessionId.
       () => this.runBuild(jobId, "PROCEED"),
       `no summary gate open for job ${jobId}`,
     );
