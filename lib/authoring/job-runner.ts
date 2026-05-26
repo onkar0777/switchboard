@@ -112,10 +112,23 @@ export class JobRunner {
 
   async feedback(jobId: string, text: string): Promise<void> {
     const settler = this.gateResolvers.get(jobId);
-    if (!settler) throw new Error(`no summary gate open for job ${jobId}`);
-    this.gateResolvers.delete(jobId);
-    await this.apply(jobId, { kind: "feedback" });
-    settler.resolve({ feedback: text });
+    if (settler) {
+      this.gateResolvers.delete(jobId);
+      await this.apply(jobId, { kind: "feedback" });
+      settler.resolve({ feedback: text });
+      return;
+    }
+    // Cold path (post-restart): re-summarize from the resumed session, then gate.
+    await this.coldResume(
+      jobId,
+      ["summary"],
+      { kind: "feedback" },
+      async (job) => {
+        await this.runTurn(jobId, `The user gave feedback: ${text}. Re-summarize.`, job.sessionId);
+        await this.awaitGateThenContinue(jobId);
+      },
+      `no summary gate open for job ${jobId}`,
+    );
   }
 
   private async apply(jobId: string, event: JobEvent): Promise<Job> {

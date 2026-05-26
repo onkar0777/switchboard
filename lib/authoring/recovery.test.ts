@@ -146,6 +146,21 @@ describe.skip("Recovery AC5 — queue no longer wedged", () => {
   it.todo("a queued job starts once a parked slot-holder is discarded");
 });
 
+describe("Recovery — feedback after restart (summary gate)", () => {
+  it("a summary-parked job re-summarizes from the resumed session on feedback", async () => {
+    const store = new JobStore(join(dir, "jobs"));
+    const created = await store.create("track PRs");
+    await store.save({ ...created, state: "summary", summary: "tracks PRs", sessionId: "sess-E" });
+
+    const agent = new FakeAgentRunner({ scripts: [[{ type: "marker", text: "[[summary]]tracks issues instead[[/summary]]" }]] });
+    const runner = new JobRunner({ store, agent, root: dir, land: vi.fn(), validate: async () => ({ ok: true as const }) });
+
+    await runner.feedback(created.id, "track issues instead");
+    await waitFor(async () => (await store.get(created.id))?.summary === "tracks issues instead");
+    expect((await store.get(created.id))?.state).toBe("summary");
+  });
+});
+
 // Implemented in Phase 3 (runner.discard does not exist yet).
 describe("Recovery AC6 — discard frees the slot + cleans up", () => {
   it.todo("DELETE removes the job file + staging dir and starts the queued job");
