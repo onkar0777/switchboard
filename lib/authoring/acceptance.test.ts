@@ -184,7 +184,17 @@ describe("AC6 — success landing", () => {
         [{ type: "session", id: "s1" }, { type: "marker", text: "[[summary]]a widget[[/summary]]" }],
         [{ type: "marker", text: "[[done:test-widget]]" }],
       ]});
-      const runner = new JobRunner({ store, agent, root, land: landPackage, validate: validateStagedPackage });
+      // Pin the validator's clock to within the founder fixture's PR week
+      // (merged May 18-20). The runner validates with new Date(), but the
+      // founder golden "happy" verdict ("Shipped: 5/5…") and momentum [0,0,0,5]
+      // are only correct when "now" falls in that week — otherwise the weekly
+      // receipts filter drops every PR and validation fails with a verdict
+      // mismatch. Pinning keeps this a deterministic test of the real
+      // validate+land path rather than a wall-clock time bomb.
+      const runner = new JobRunner({
+        store, agent, root, land: landPackage,
+        validate: (dir) => validateStagedPackage(dir, new Date("2026-05-21T00:00:00.000Z")),
+      });
       const job = await runner.enqueue("track PRs");
       await waitFor(async () => (await store.get(job.id))?.state === "summary");
 
