@@ -19,7 +19,7 @@ export type ThenExpect = z.infer<typeof ThenSchema>;
 // executed in-memory via execute().
 const DataCaseSchema = z.object({
   name: z.string().min(1),
-  given: z.record(z.array(z.record(z.unknown()))),
+  given: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))),
   then: ThenSchema,
 });
 

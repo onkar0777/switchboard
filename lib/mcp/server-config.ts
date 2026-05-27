@@ -6,14 +6,14 @@ import { McpUnavailableError } from "./errors";
 export const HttpTransportSchema = z.object({
   type: z.literal("http"),
   url: z.string().url(),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
 });
 
 export const StdioTransportSchema = z.object({
   type: z.literal("stdio"),
   command: z.string().min(1),
   args: z.array(z.string()).default([]),
-  env: z.record(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
 });
 
 export const ServerConfigSchema = z.object({
